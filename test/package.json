@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "scripts": { "e2e": "node e2e.js && node e2e.js desktop-legacy" },
+  "devDependencies": { "playwright-core": "1.48.2" }
+}

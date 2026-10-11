@@ -1,0 +1,19 @@
+---
+name: "Who's Watching"
+guid: "2d627493-2b57-432a-b238-c22aaf9fd609"
+version: "1.2.0.0"
+targetAbi: "12.0.0.0"
+framework: "net10.0"
+overview: "Netflix-style profile switching from the avatar button in Jellyfin Web"
+description: >
+  Click your avatar in Jellyfin Web to open a "Who's watching?" profile picker and
+  switch user. Uses Jellyfin's own login API and session handling; adds no new
+  authentication endpoints and stores no credentials.
+category: "General"
+owner: "freevibeprojects"
+artifacts:
+  - "Jellyfin.Plugin.WhoIsWatching.dll"
+changelog: >
+  Manage profiles (Netflix-style) with a shared profile-picture gallery anyone can add to,
+  kept on the server; brand text (default "Jellyfin") with text, colour, size and position
+  set in the plugin's dashboard page, where admins also remove gallery pictures.

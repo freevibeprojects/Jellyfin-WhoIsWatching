@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<html>
+<head>
+    <title>Who's Watching</title>
+</head>
+<body>
+    <div id="wiwConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select">
+        <div data-role="content">
+            <div class="content-primary">
+                <h1>Who's Watching</h1>
+                <form id="wiwConfigForm">
+                    <h2>Brand text</h2>
+                    <p class="fieldDescription">Shown in a corner of the "Who's watching?" screen, like Netflix's logo. Leave the text empty to hide it.</p>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="text" id="wiwBrandText" maxlength="40" label="Text" />
+                    </div>
+                    <div class="inputContainer">
+                        <label for="wiwBrandColor">Colour</label>
+                        <input type="color" id="wiwBrandColor" style="display:block;width:4em;height:2.5em;margin-top:.5em" />
+                    </div>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="number" id="wiwBrandSize" min="12" max="120" required label="Size (pixels)" />
+                    </div>
+                    <div class="selectContainer">
+                        <select is="emby-select" id="wiwBrandPosition" label="Position">
+                            <option value="TopLeft">Top left</option>
+                            <option value="TopCenter">Top centre</option>
+                            <option value="TopRight">Top right</option>
+                        </select>
+                    </div>
+                    <div style="margin:1em 0 2em;padding:1em 1.5em;border-radius:.3em;background:#101010">
+                        <span id="wiwBrandPreview" style="font-weight:700;line-height:1"></span>
+                    </div>
+                    <button is="emby-button" type="submit" class="raised button-submit block"><span>Save</span></button>
+                </form>
+
+                <h2 style="margin-top:2em">Profile pictures</h2>
+                <p class="fieldDescription">The shared gallery people pick from under "Manage profiles". Removing a picture here doesn't change anyone's current profile picture.</p>
+                <p id="wiwGalleryCount" class="fieldDescription"></p>
+                <div id="wiwGallery" style="display:flex;flex-wrap:wrap;gap:1em"></div>
+            </div>
+        </div>
+        <script type="text/javascript">
+            (function () {
+                var pluginId = '2d627493-2b57-432a-b238-c22aaf9fd609';
+                var page = document.querySelector('#wiwConfigPage');
+                var field = function (id) { return page.querySelector('#' + id); };
+
+                function preview() {
+                    var text = field('wiwBrandPreview');
+                    text.textContent = field('wiwBrandText').value || '(hidden)';
+                    text.style.color = field('wiwBrandColor').value;
+                    text.style.fontSize = Math.min(Math.max(Number(field('wiwBrandSize').value) || 40, 12), 120) + 'px';
+                }
+
+                function loadGallery() {
+                    ApiClient.getJSON(ApiClient.getUrl('WhoIsWatching/Images')).then(function (ids) {
+                        field('wiwGalleryCount').textContent = ids.length + ' of 200 pictures.';
+                        field('wiwGallery').replaceChildren.apply(field('wiwGallery'), ids.map(function (id) {
+                            var item = document.createElement('div');
+                            item.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:.5em';
+                            var img = document.createElement('img');
+                            img.alt = '';
+                            img.loading = 'lazy';
+                            img.src = ApiClient.getUrl('WhoIsWatching/Images/' + id);
+                            img.style.cssText = 'width:7em;height:7em;object-fit:cover;border-radius:12%';
+                            var remove = document.createElement('button');
+                            remove.setAttribute('is', 'emby-button');
+                            remove.type = 'button';
+                            remove.className = 'raised wiwDelete';
+                            remove.textContent = 'Delete';
+                            remove.addEventListener('click', function () {
+                                ApiClient.ajax({ type: 'DELETE', url: ApiClient.getUrl('WhoIsWatching/Images/' + id) }).then(loadGallery);
+                            });
+                            item.append(img, remove);
+                            return item;
+                        }));
+                    });
+                }
+
+                page.addEventListener('pageshow', function () {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        field('wiwBrandText').value = config.BrandText || '';
+                        field('wiwBrandColor').value = /^#[0-9A-Fa-f]{6}$/.test(config.BrandColor) ? config.BrandColor : '#AA5CC3';
+                        field('wiwBrandSize').value = config.BrandSize;
+                        field('wiwBrandPosition').value = config.BrandPosition || 'TopLeft';
+                        preview();
+                        Dashboard.hideLoadingMsg();
+                    });
+                    loadGallery();
+                });
+
+                ['wiwBrandText', 'wiwBrandColor', 'wiwBrandSize'].forEach(function (id) {
+                    field(id).addEventListener('input', preview);
+                });
+
+                field('wiwConfigForm').addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        config.BrandText = field('wiwBrandText').value.trim();
+                        config.BrandColor = field('wiwBrandColor').value;
+                        config.BrandSize = Number(field('wiwBrandSize').value);
+                        config.BrandPosition = field('wiwBrandPosition').value;
+                        ApiClient.updatePluginConfiguration(pluginId, config).then(Dashboard.processPluginConfigurationUpdateResult);
+                    });
+                });
+            })();
+        </script>
+    </div>
+</body>
+</html>

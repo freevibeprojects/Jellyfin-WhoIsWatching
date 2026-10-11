@@ -1,0 +1,157 @@
+# Who's Watching (Jellyfin plugin)
+
+A Netflix-style **"Who's watching?"** profile switcher inside Jellyfin Web. Click your avatar
+in the top bar, pick a profile, enter its password if needed, and you are now that user.
+
+- Jellyfin **12.0+** (built against 12.0.0, tested on 12.2.0)
+- Server side: one ~80 KB DLL with no dependencies, no background work and no database. A settings page in the dashboard; the shared picture gallery is plain files.
+- Client side: one 45 KB script (13 KB compressed), loaded once and idle until the avatar is clicked
+
+## How it works
+
+| Piece | What it does |
+|---|---|
+| `ScriptInjection.cs` | An ASP.NET Core `IStartupFilter`, registered through Jellyfin's `IPluginServiceRegistrator`. When `…/web/` or `…/web/index.html` is served, it appends `<script defer src="../WhoIsWatching/client.js?v=…">`. Nothing is written to disk, so read-only installs (Docker, distro packages) work. Every other request costs one string comparison. |
+| `ClientScriptController.cs` | Serves the embedded script (`GET /WhoIsWatching/client.js`) anonymously. It is static and holds no data. |
+| `GalleryController.cs` | The brand-text settings (`GET /WhoIsWatching/Settings`) and the shared picture gallery (`/WhoIsWatching/Images`). See *Profile pictures*. |
+| `Web/client.js` | Intercepts clicks on the avatar button and shows the picker. It switches users with Jellyfin's own client API, then reloads the page. *Manage profiles* changes pictures; the gear runs the avatar button's normal action (settings or user menu). |
+| `Web/config.html` | The plugin's page in *Dashboard → Plugins*: brand text, and removing gallery pictures. |
+
+The switch uses only what the login page uses:
+
+1. The profile list comes from `GET /Users/Public`, the login screen's own list. The server has already applied every rule: *Hide this user from login screens*, disabled accounts, device access, and remote-access restrictions.
+2. Sign-in goes through `ApiClient.authenticateUserByName`, which is the login page's call to `POST /Users/AuthenticateByName`. The web client stores the new session exactly as after a normal sign-in.
+3. The previous user's token is revoked with `POST /Sessions/Logout`. This is needed because Jellyfin only replaces tokens of the *same* user on a device, so without it the old token would stay valid.
+4. The page fully reloads to the home screen. Many of jellyfin-web's query-cache keys don't include the user ID, so switching without a reload could show the previous profile's cached rows (for example, an adult's suggestions on a child's profile).
+
+There is no new authentication endpoint, session store, cookie or cryptography. The plugin's own endpoints only serve its script, its settings and the picture gallery.
+
+### Password behaviour
+
+Jellyfin 12 never tells clients whether a user has a password: `UserDto.HasPassword` is always `true`, and the login page always shows the password form. This plugin keeps that rule.
+
+- Every profile gets a password step, and leaving it blank is allowed.
+- A profile is never tried with a blank password automatically. A wrong guess would count toward Jellyfin's login lockout and appear in the activity log.
+- After a profile signs in with a blank password once, this browser remembers its **user ID** (in `localStorage`, per server) and switches to it in one click next time. If a password is added later, the one-click attempt fails once and the password step appears.
+- **Remember on this device** (in the password step) keeps that profile signed in on this browser, so it opens in one click, like Jellyfin's own *Remember me*. What is kept is the profile's Jellyfin access token, never the password. Switching away from a remembered profile leaves its session running instead of ending it.
+  - **Administrator accounts can never be remembered.** They always ask for the password, so a child on a shared TV can't one-click into the account that controls parental settings.
+  - A remembered profile is forgotten, and asks for its password again, when its password is changed, its session is ended (for example from *Dashboard → Devices*), or anyone signs out of Jellyfin in this browser. Signing out also ends every remembered profile's session.
+  - The server still applies the profile's rules (disabled account, access schedule, remote access) every time it is used.
+
+### Look
+
+The picker takes its accent colour from the active theme each time it opens, by reading the colour of Jellyfin's own primary buttons. It follows the built-in themes and any custom CSS that restyles them, and falls back to the theme's `--jf-palette-primary-main`.
+
+The brand text in the corner (like Netflix's logo) is set in *Dashboard → Plugins → Who's Watching*: text, colour, size and position (top left, centre or right). It defaults to "Jellyfin" in Jellyfin's logo purple, `#AA5CC3`. Leave the text empty to hide it.
+
+### Profile pictures
+
+It works like Netflix:
+
+1. **Manage profiles**, under the profiles, switches to edit mode. Profiles you may change show a pencil: your own, or every profile for administrators. This follows Jellyfin's rule *Allow this user to manage their own preferences*.
+2. Picking one opens **Choose a profile picture**, a page with a shared gallery that everyone sees. The **+** tile adds a picture to it. The picture is cropped to a centred square and shrunk to at most 512 px (JPEG) first, because Jellyfin serves profile pictures at their uploaded size.
+3. Picking a picture asks **Change profile picture?** (current → new), with **Let's do it** / **Not yet**.
+
+The picture is then copied to the profile through Jellyfin's own user-image API, which applies Jellyfin's permission checks.
+
+The gallery is kept on the server in `<data dir>/plugins/configurations/WhoIsWatching/images/`, so it survives plugin updates. Administrators remove pictures in the plugin's dashboard page. Removing one doesn't change anyone's current picture.
+
+## Admin setup
+
+**Jellyfin 12 hides new users from login screens by default**, and the picker shows exactly the users the login screen would. For each profile that should appear, go to *Dashboard → Users → (user) → Profile* and untick **Hide this user from login screens**.
+
+If no other profile is visible, the avatar button behaves exactly as without the plugin.
+
+## Supported clients
+
+The plugin only works where the server's own Jellyfin Web UI runs, because that is the only place the script can load.
+
+| Client | Status |
+|---|---|
+| Jellyfin Web in a browser (modern, legacy and TV layouts) | Supported; all three layouts tested end to end |
+| Jellyfin Desktop / Jellyfin Media Player, Jellyfin Android (web UI mode), Jellyfin for webOS | Expected to work: they load the server's web UI. Not tested. webOS needs Chromium 55+ (webOS 5 or newer). |
+| Jellyfin for Tizen | Not supported: it bundles its own copy of jellyfin-web |
+| Android TV, Swiftfin, Findroid, Streamyfin, Kodi, Infuse, other native apps | Not supported: they don't run Jellyfin Web |
+
+Browser requirements: `<dialog>` and ES2017 (Chrome/Edge 55+, Firefox 98+, Safari 15.4+). Older engines skip the plugin and the avatar keeps its normal behaviour.
+
+## Compatibility surface
+
+Jellyfin has no official extension point for the main web UI, so the plugin relies on the items below. They are kept in one place and checked at runtime; if any is missing, the plugin steps aside and the avatar works as before.
+
+| Dependency | Stability |
+|---|---|
+| `IPluginServiceRegistrator` | Public plugin API |
+| `IStartupFilter` honoured by Jellyfin's ASP.NET Core generic host | Standard ASP.NET Core; Jellyfin has used `Host.CreateDefaultBuilder` + `UseStartup` since 10.x |
+| `/Users/Public`, `/Users/AuthenticateByName`, `/Sessions/Logout` | Public REST API |
+| `window.ApiClient` and its methods | Undocumented global, but jellyfin-web keeps it for plugins and uses it in its own code. `client.js` checks each method before taking over the click. Optional extras are checked too: `onAuthenticated` (Remember on this device), `logout` (wrapped so signing out forgets remembered profiles), `uploadUserImage` (Manage profiles). |
+| `.button-submit` colour | Read at runtime for the accent; falls back to the theme variable and then Jellyfin blue |
+| Avatar selectors `.headerUserButton`, `[aria-controls="app-user-menu"]` | Internal markup, **the most likely thing to break**. One constant at the top of `client.js`. |
+| `--jf-palette-*` CSS variables | MUI theme variables; every use has a fallback colour |
+
+After a Jellyfin upgrade, run the smoke test (below) to check all of these at once.
+
+## Security notes
+
+- Passwords are read from the form, sent once to Jellyfin's login endpoint, and the field is cleared. They are never stored or logged.
+- **Use HTTPS.** The plugin adds no encryption of its own: the password travels in the body of `POST /Users/AuthenticateByName`, exactly as from the login page, so it is protected only if Jellyfin or a reverse proxy serves HTTPS. Over plain HTTP it crosses the network in cleartext, and switching profiles means typing passwords more often than signing in once.
+- The plugin stores, per server in `localStorage`: the passwordless hint (user IDs) and, only for profiles you tick *Remember on this device* for, their access tokens. It never stores a password. Values of the wrong shape (corrupt or tampered) are ignored, so they can't trigger sign-in attempts.
+- A remembered profile is as exposed as Jellyfin's own *Remember me*: **anyone who can use this browser or TV can open it**, and a script running in the page (another plugin, or an XSS in Jellyfin Web) could read its token, as it can already read the signed-in user's token in `jellyfin_credentials`. Remember only profiles you'd leave signed in on that device. Changing the password, or ending the session in *Dashboard → Devices*, cuts a remembered device off.
+- Every refusal shows one generic message (401 and 403 alike), so the response doesn't reveal why a sign-in was rejected.
+- User names and the brand text are only ever inserted with `textContent`. The brand settings are validated on the server: a `#RRGGBB` colour, 12–120 px, one of three positions, at most 40 characters.
+- Picture gallery (`/WhoIsWatching/Images`):
+  - Listing needs a signed-in user. Each picture is served anonymously by its random ID, because an `<img>` can't send a token; Jellyfin serves user pictures the same way.
+  - Adding needs *Allow this user to manage their own preferences*. Only JPEG, PNG and WebP are accepted, checked by their bytes, at most 1 MB each and 200 in total.
+  - Files are named by the server (a new GUID), so nothing a client sends becomes a path. They are served with `X-Content-Type-Options: nosniff` and a sandboxing `Content-Security-Policy`.
+  - Only administrators can delete.
+  - Profile pictures are applied through Jellyfin's own API, so Jellyfin's permission checks decide who may change whose picture.
+- Lockout, parental access schedules, device restrictions, max sessions and remote-access policy are all enforced by the server, because the plugin goes through Jellyfin's normal sign-in.
+- Switching signs the previous profile out on this device. Other open tabs still running as that profile lose access, because its token is revoked, and pick up the new profile when reloaded. They share the browser's stored session, as with any Jellyfin sign-in.
+- Anyone who can open the picker can attempt any listed profile's password. That is the same exposure as Jellyfin's login screen, which shows the same list to anyone. Use *Hide this user from login screens* for accounts that shouldn't be offered.
+
+## Limitations
+
+- English UI text only (the `TEXT` object in `client.js`).
+- Users who only sign in through Quick Connect or an SSO plugin can't be switched to by password. Use the normal sign-out flow for them.
+- If **Remember me** was unticked at sign-in, Jellyfin forgets the session on any page reload. Switching reloads the page, so those users land on the login screen.
+- Jellyfin serves profile pictures at their uploaded size: it ignores size options for user images, so the login page downloads them in full too. Pictures added through the picker's gallery are shrunk first; ones uploaded in the dashboard are not, so a multi-megabyte phone photo set there is downloaded in full the first time the picker opens.
+
+## Build and install
+
+```sh
+dotnet build Jellyfin.Plugin.WhoIsWatching -c Release
+# copy bin/Release/net10.0/Jellyfin.Plugin.WhoIsWatching.dll to
+#   <jellyfin data dir>/plugins/WhoIsWatching_1.2.0.0/
+# then restart Jellyfin
+```
+
+`build.yaml` is a [jprm](https://github.com/oddstr13/jellyfin-plugin-repository-manager) manifest for publishing to a plugin repository.
+
+Some Linux-distro .NET SDKs ship without the ASP.NET Core targeting pack and fail with
+`NETSDK1226: Prune Package data not found`. Install the `aspnet-targeting-pack` package, or build with
+`-p:AllowMissingPrunePackageData=true`.
+
+## Smoke test
+
+`test/` drives a real server and a headless Chromium through the whole flow. It checks:
+
+- the picker's contents and keyboard navigation
+- that a wrong password leaves the current session untouched
+- switching, and that the previous token is revoked
+- passwordless one-click switching, and that a tampered passwordless hint triggers no sign-in attempt
+- Remember on this device: one click with no password sent, administrators excluded, an ended session asking for the password again, and signing out forgetting remembered profiles
+- Manage profiles (who may change which picture), adding a gallery picture (square, at most 512 px), reusing it for another profile, and the dashboard page saving settings and deleting pictures
+- the brand text (default and custom), the gear icon, and the accent following a custom theme
+- the gallery API's rules (below)
+- that the avatar's original action is passed through, including when the picker can't be shown
+- that no password ends up in `localStorage`
+
+```sh
+cd test && npm install
+JF_URL=http://127.0.0.1:8096 ./setup.sh        # fresh server, wizard not yet run
+node e2e.js && node e2e.js desktop-legacy && node e2e.js tv
+```
+
+## License
+
+[GPL-3.0-only](LICENSE): the GNU General Public License, version 3 only. Jellyfin's plugin packages (`Jellyfin.Controller`, `Jellyfin.Common`) are GPL-3.0-only too.
