@@ -42,6 +42,8 @@ Jellyfin 12 never tells clients whether a user has a password: `UserDto.HasPassw
 
 ### Look
 
+The picker scales with the screen: the same proportions on a phone, at 1080p, on a 1440p (2K) monitor and at 4K, limited by height on wide or short windows. Older engines without `clamp()` keep the 1080p sizes.
+
 The picker takes its accent colour from the active theme each time it opens, by reading the colour of Jellyfin's own primary buttons. It follows the built-in themes and any custom CSS that restyles them, and falls back to the theme's `--jf-palette-primary-main`.
 
 The brand text in the corner (like Netflix's logo) is set in *Dashboard → Plugins → Who's Watching*: text, colour, size and position (top left, centre or right). It defaults to "Jellyfin" in Jellyfin's logo purple, `#AA5CC3`. Leave the text empty to hide it.
@@ -114,6 +116,7 @@ After a Jellyfin upgrade, run the smoke test (below) to check all of these at on
 - **Use HTTPS.** The plugin adds no encryption of its own: the password travels in the body of `POST /Users/AuthenticateByName`, exactly as from the login page, so it is protected only if Jellyfin or a reverse proxy serves HTTPS. Over plain HTTP it crosses the network in cleartext, and switching profiles means typing passwords more often than signing in once.
 - The plugin stores, per server in `localStorage`: the passwordless hint (user IDs) and, only for profiles you tick *Remember on this device* for, their access tokens. It never stores a password. Values of the wrong shape (corrupt or tampered) are ignored, so they can't trigger sign-in attempts.
 - A remembered profile is as exposed as Jellyfin's own *Remember me*: **anyone who can use this browser or TV can open it**, and a script running in the page (another plugin, or an XSS in Jellyfin Web) could read its token, as it can already read the signed-in user's token in `jellyfin_credentials`. Remember only profiles you'd leave signed in on that device. Changing the password, or ending the session in *Dashboard → Devices*, cuts a remembered device off.
+- **Updates come from this GitHub repository.** Jellyfin's *Update Plugins* task installs new versions automatically, and a plugin runs with the server's full rights, so whoever controls the repository controls code on your server. If you'd rather review each update, remove the repository after installing and add it back when you want to update.
 - Every refusal shows one generic message (401 and 403 alike), so the response doesn't reveal why a sign-in was rejected.
 - User names and the brand text are only ever inserted with `textContent`. The brand settings are validated on the server: a `#RRGGBB` colour, 12–120 px, one of three positions, at most 40 characters.
 - Picture gallery (`/WhoIsWatching/Images`):
@@ -178,6 +181,7 @@ Some Linux-distro .NET SDKs ship without the ASP.NET Core targeting pack and fai
 - Remember on this device: one click with no password sent, administrators excluded, an ended session asking for the password again, and signing out forgetting remembered profiles
 - Manage profiles (who may change which picture), adding a gallery picture (square, at most 512 px), reusing it for another profile, and the dashboard page saving settings and deleting pictures
 - the brand text (default and custom), the gear icon, and the accent following a custom theme
+- scaling (profiles 4/3 as big at 1440p and twice as big at 4K as at 1080p, no sideways overflow on phones), and that pressing the avatar preloads the profiles
 - the gallery API's rules (below)
 - that the avatar's original action is passed through, including when the picker can't be shown
 - that no password ends up in `localStorage`
