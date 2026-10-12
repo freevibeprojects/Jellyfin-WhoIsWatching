@@ -63,29 +63,32 @@
     const ICON_ARROW = 'M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z';
 
     // --wiw-accent and --wiw-on-accent are set from the current theme each time the picker opens.
+    // Plain values come before modern ones (clamp, max, env) so older engines (Jellyfin Media Player's
+    // Chromium, older Safari and webOS) keep a working layout; .wiw-nogap stands in for flexbox gap.
     const CSS = `
-.wiw{position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;border:0;
+.wiw{position:fixed;top:0;right:0;bottom:0;left:0;z-index:2147483647;width:100%;height:100%;max-width:none;max-height:none;margin:0;border:0;padding:16px;
  padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));
  box-sizing:border-box;overflow:auto;background:var(--jf-palette-background-default,#101010);
  color:var(--jf-palette-text-primary,#fff);font:inherit;animation:wiw-in .18s ease-out}
 .wiw[open]{display:flex}
+.wiw:not([open]){display:none}
 .wiw::backdrop{background:var(--jf-palette-background-default,#101010)}
 .wiw[aria-busy=true]{cursor:progress}
 .wiw-panel{margin:auto;display:flex;flex-direction:column;align-items:center;gap:2em;text-align:center;max-width:64em}
 .wiw-panel[hidden]{display:none}
-.wiw-title{margin:0;font-size:clamp(1.6rem,4vw,3rem);font-weight:500}
+.wiw-title{margin:0;font-size:2.2rem;font-size:clamp(1.6rem,4vw,3rem);font-weight:500}
 .wiw-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(1rem,2.5vw,2rem);margin:0;padding:0;list-style:none}
-.wiw-profile{display:flex;flex-direction:column;align-items:center;gap:.7em;width:clamp(5.5rem,11vw,9rem);padding:0;border:0;
+.wiw-profile{display:flex;flex-direction:column;align-items:center;gap:.7em;width:7.5rem;width:clamp(5.5rem,11vw,9rem);padding:0;border:0;
  background:none;color:var(--jf-palette-text-secondary,rgba(255,255,255,.7));font:inherit;cursor:pointer;outline:none}
 .wiw-avatar{position:relative;display:grid;place-items:center;width:100%;aspect-ratio:1;overflow:hidden;border-radius:12%;
- background:var(--wiw-color);color:#fff;font-size:clamp(2rem,5vw,3.5rem);font-weight:500;
+ background:var(--wiw-color);color:#fff;font-size:2.8rem;font-size:clamp(2rem,5vw,3.5rem);font-weight:500;
  box-shadow:0 0 0 0 transparent;transition:box-shadow .15s,transform .15s}
-.wiw-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.wiw-avatar img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover}
 .wiw-profile[aria-current=true] .wiw-avatar{box-shadow:0 0 0 3px var(--wiw-accent,#00a4dc)}
 button.wiw-profile:hover,button.wiw-profile:focus-visible{color:var(--jf-palette-text-primary,#fff)}
 button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 3px var(--jf-palette-text-primary,#fff);transform:scale(1.04)}
 .wiw-busy .wiw-avatar{animation:wiw-pulse 1s ease-in-out infinite}
-.wiw-name{display:flex;align-items:center;gap:.3em;max-width:100%;font-size:1.05em;overflow-wrap:anywhere}
+.wiw-name{display:flex;align-items:center;gap:.3em;max-width:100%;font-size:1.05em;word-break:break-word;overflow-wrap:anywhere}
 .wiw svg{width:1em;height:1em;flex:none;fill:currentColor}
 .wiw-button{min-height:2.75em;padding:.5em 1.6em;border:1px solid var(--jf-palette-text-secondary,rgba(255,255,255,.7));border-radius:.3em;
  background:none;color:var(--jf-palette-text-secondary,rgba(255,255,255,.7));font:inherit;letter-spacing:.05em;cursor:pointer}
@@ -94,53 +97,62 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
 .wiw-primary:hover,.wiw-primary:focus-visible{border-color:var(--jf-palette-text-primary,#fff);color:var(--wiw-on-accent,#fff)}
 .wiw-button:focus-visible,.wiw-close:focus-visible,.wiw-input:focus-visible,.wiw-remember:focus-visible{outline:2px solid var(--wiw-accent,#00a4dc);outline-offset:2px}
 .wiw button:disabled,.wiw input:disabled{cursor:progress}
-.wiw-close{position:absolute;top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));display:grid;place-items:center;
+.wiw-close{position:absolute;top:12px;right:12px;top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));display:grid;place-items:center;
  width:2.75em;height:2.75em;padding:0;border:0;border-radius:50%;background:none;color:inherit;font-size:1.2em;cursor:pointer}
 .wiw-close:hover{background:var(--jf-palette-action-hover,rgba(255,255,255,.08))}
 .wiw-icon{display:grid;place-items:center;width:2em;height:2em;padding:0;border:0;border-radius:50%;background:none;
  color:var(--jf-palette-text-secondary,rgba(255,255,255,.7));font-size:1.6em;cursor:pointer;outline:none;transition:transform .2s,color .2s}
 .wiw-icon:hover,.wiw-icon:focus-visible{color:var(--wiw-accent,#00a4dc);transform:scale(1.25)}
-.wiw-brand{position:absolute;top:max(16px,env(safe-area-inset-top));left:max(24px,env(safe-area-inset-left));margin:0;
+.wiw-brand{position:absolute;top:16px;left:24px;top:max(16px,env(safe-area-inset-top));left:max(24px,env(safe-area-inset-left));margin:0;
  font-size:var(--wiw-brand-size,40px);font-weight:700;line-height:1;white-space:nowrap}
 .wiw-brand[data-position=TopCenter]{left:50%;transform:translateX(-50%)}
-.wiw-brand[data-position=TopRight]{left:auto;right:calc(max(12px,env(safe-area-inset-right)) + 3.5rem)}
+.wiw-brand[data-position=TopRight]{left:auto;right:4.5rem;right:calc(max(12px,env(safe-area-inset-right)) + 3.5rem)}
 .wiw-brand[hidden]{display:none}
-.wiw-branded{padding-top:calc(max(16px,env(safe-area-inset-top)) + var(--wiw-brand-size,40px) + 1rem)}
-.wiw-pencil{position:absolute;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.55);color:#fff;font-size:.5em}
+.wiw-branded{padding-top:calc(16px + var(--wiw-brand-size,40px) + 1rem);padding-top:calc(max(16px,env(safe-area-inset-top)) + var(--wiw-brand-size,40px) + 1rem)}
+.wiw-pencil{position:absolute;top:0;left:0;width:100%;height:100%;display:grid;place-items:center;background:rgba(0,0,0,.55);color:#fff;font-size:.5em}
 .wiw-pencil svg{padding:.35em;border:2px solid;border-radius:50%}
 .wiw-new .wiw-avatar{background:var(--jf-palette-background-paper,#202020)}
 .wiw-profile[aria-disabled=true]{opacity:.35;cursor:default}
 .wiw-for .wiw-profile{width:5rem;font-size:.9rem}
 .wiw-for .wiw-avatar{font-size:2rem}
 .wiw-gallery{display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(.75rem,2vw,1.25rem);margin:0;padding:0;list-style:none}
-.wiw-tile{position:relative;display:grid;place-items:center;width:clamp(4.5rem,9vw,7rem);aspect-ratio:1;padding:0;border:0;border-radius:12%;overflow:hidden;
+.wiw-tile{position:relative;display:grid;place-items:center;width:6rem;width:clamp(4.5rem,9vw,7rem);aspect-ratio:1;padding:0;border:0;border-radius:12%;overflow:hidden;
  background:var(--jf-palette-background-paper,#202020);color:var(--jf-palette-text-secondary,rgba(255,255,255,.7));font-size:2.2em;cursor:pointer;outline:none;transition:box-shadow .15s,transform .15s}
-.wiw-tile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.wiw-tile img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover}
 .wiw-tile:hover,.wiw-tile:focus-visible{box-shadow:0 0 0 3px var(--wiw-accent,#00a4dc);transform:scale(1.06)}
 .wiw-add{border:2px dashed currentColor}
 .wiw-add:hover,.wiw-add:focus-visible{color:var(--wiw-accent,#00a4dc)}
 .wiw-compare{display:flex;align-items:center;gap:clamp(1rem,4vw,3rem)}
-.wiw-compare figure{display:flex;flex-direction:column;align-items:center;gap:.7em;width:clamp(6rem,14vw,10rem);margin:0;color:var(--jf-palette-text-secondary,rgba(255,255,255,.7))}
+.wiw-compare figure{display:flex;flex-direction:column;align-items:center;gap:.7em;width:8rem;width:clamp(6rem,14vw,10rem);margin:0;color:var(--jf-palette-text-secondary,rgba(255,255,255,.7))}
 .wiw-compare>svg{font-size:2em}
 .wiw-auth .wiw-profile{cursor:default;color:var(--jf-palette-text-primary,#fff)}
-.wiw-field{display:flex;flex-direction:column;align-items:stretch;gap:.4em;width:min(20em,80vw);text-align:start;color:var(--jf-palette-text-secondary,rgba(255,255,255,.7))}
+.wiw-field{display:flex;flex-direction:column;align-items:stretch;gap:.4em;width:20em;max-width:80vw;text-align:start;color:var(--jf-palette-text-secondary,rgba(255,255,255,.7))}
 .wiw-hint{font-size:.85em}
 .wiw-input{box-sizing:border-box;width:100%;min-height:2.75em;padding:.5em .8em;border:1px solid var(--jf-palette-divider,rgba(255,255,255,.12));border-radius:.3em;
  background:var(--jf-palette-FilledInput-bg,#292929);color:var(--jf-palette-text-primary,#fff);font:inherit}
-.wiw-check{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:.2em .6em;width:min(20em,80vw);margin-top:-1em;text-align:start;cursor:pointer}
+.wiw-check{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:.2em .6em;width:20em;max-width:80vw;margin-top:-1em;text-align:start;cursor:pointer}
 .wiw-check[hidden]{display:none}
 .wiw-check .wiw-hint{grid-column:2;color:var(--jf-palette-text-secondary,rgba(255,255,255,.7))}
 .wiw-remember{width:1.2em;height:1.2em;margin:0;accent-color:var(--wiw-accent,#00a4dc)}
 .wiw-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:1em}
 .wiw-error{min-height:1.5em;margin:-1em 0 0;color:var(--jf-palette-error-light,#ef5350)}
+@supports not (aspect-ratio:1/1){
+ .wiw-profile{width:7.5rem}.wiw-profile .wiw-avatar{height:7.5rem}.wiw-for .wiw-profile{width:5rem}.wiw-for .wiw-avatar{height:5rem}
+ .wiw-compare figure{width:8rem}.wiw-compare .wiw-avatar{height:8rem}.wiw-tile{width:6rem;height:6rem}}
+.wiw-nogap .wiw-panel>*+*{margin-top:2em}
+.wiw-nogap .wiw-grid>li,.wiw-nogap .wiw-gallery>li{margin:.6rem}
+.wiw-nogap .wiw-profile>*+*,.wiw-nogap .wiw-compare figure>*+*{margin-top:.7em}
+.wiw-nogap .wiw-field>*+*{margin-top:.4em}
+.wiw-nogap .wiw-actions>*,.wiw-nogap .wiw-compare>*{margin:0 .5em}
 @keyframes wiw-in{from{opacity:0;transform:scale(1.03)}}
 @keyframes wiw-pulse{50%{opacity:.5}}
 @media (prefers-reduced-motion:reduce){.wiw,.wiw-avatar,.wiw-busy .wiw-avatar,.wiw-icon,.wiw-tile{animation:none;transition:none}}
 `;
 
-    if (!window.HTMLDialogElement) {
-        return;
-    }
+    // Shown in the console so a device where the picker doesn't appear can be checked (F12, or
+    // chrome://inspect for the Android app).
+    const VERSION = ((document.currentScript && /[?&]v=([\d.]+)/.exec(document.currentScript.src)) || [])[1];
+    console.info(`[WhoIsWatching] ${VERSION || ''} loaded`);
 
     let dialog;
     let pickPanel;
@@ -167,13 +179,18 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
         watchSignOut(window.ApiClient);
         const button = !bypass && e.target instanceof Element && e.target.closest(AVATAR_SELECTOR);
         const api = window.ApiClient;
-        if (!button || !api || !API_METHODS.every(m => typeof api[m] === 'function') || !api.getCurrentUserId()) {
+        if (!button) {
+            return;
+        }
+
+        if (!api || !API_METHODS.every(m => typeof api[m] === 'function') || !api.getCurrentUserId()) {
+            console.info('[WhoIsWatching] not signed in, or this Jellyfin Web lacks ApiClient methods; avatar left alone');
             return;
         }
 
         e.preventDefault();
         e.stopImmediatePropagation();
-        if (opening || (dialog && dialog.open)) {
+        if (opening || isOpen()) {
             return;
         }
 
@@ -197,6 +214,11 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
             if (users.length >= 2) {
                 open(api, users, settings);
                 return;
+            }
+
+            if (users.length) {
+                console.info('[WhoIsWatching] no other profile is visible to this user (Dashboard \u2192 Users \u2192 Profile: '
+                    + '"Hide this user from login screens"); avatar left alone');
             }
         } catch (err) {
             console.warn('[WhoIsWatching] could not show profiles', err);
@@ -243,7 +265,7 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
         showBrand(settings);
         render(api, users);
         showPick();
-        dialog.showModal();
+        showDialog();
         (pickPanel.querySelector('[aria-current]') || pickPanel.querySelector('.wiw-grid button')).focus();
     }
 
@@ -262,7 +284,7 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
 
         const currentId = api.getCurrentUserId();
         buttons.clear();
-        pickPanel.querySelector('.wiw-grid').replaceChildren(...users.map(user => {
+        fill(pickPanel.querySelector('.wiw-grid'), ...users.map(user => {
             const li = document.createElement('li');
             const button = profileButton(api, user, user.Id === currentId);
             buttons.set(user.Id, button);
@@ -311,11 +333,17 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
 
     function build() {
         const style = document.createElement('style');
-        style.textContent = CSS;
+        // Where :focus-visible is unknown (older Chromium, Safari before 15.4) the whole rule would be
+        // dropped and remotes would show no highlight, so fall back to :focus.
+        style.textContent = supportsSelector(':focus-visible') ? CSS : CSS.replace(/:focus-visible/g, ':focus');
         document.head.append(style);
 
-        dialog = document.createElement('dialog');
+        // A <div> stands in where <dialog> is missing (Safari before 15.4, old WebViews).
+        dialog = document.createElement(window.HTMLDialogElement ? 'dialog' : 'div');
         dialog.className = 'wiw';
+        dialog.classList.toggle('wiw-nogap', !supportsFlexGap());
+        dialog.setAttribute('role', 'dialog');
+        dialog.setAttribute('aria-modal', 'true');
         dialog.setAttribute('aria-labelledby', 'wiw-title');
         // Static markup only; user-provided values are always set through textContent/attributes.
         dialog.innerHTML = `
@@ -380,7 +408,7 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
             } else if (name === 'apply') {
                 applyPicture(window.ApiClient);
             } else {
-                dialog.close();
+                closeDialog();
                 if (name === 'account') {
                     passThrough();
                 }
@@ -419,7 +447,60 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
         });
 
         dialog.addEventListener('keydown', onKeyDown);
+        // Without a real modal dialog, keep keyboard focus from wandering to the page behind.
+        document.addEventListener('focusin', e => {
+            if (isOpen() && !dialog.contains(e.target)) {
+                (dialog.querySelector('.wiw-panel:not([hidden]) button') || dialog.querySelector('.wiw-close')).focus();
+            }
+        });
         document.body.append(dialog);
+    }
+
+    function isOpen() {
+        return Boolean(dialog) && dialog.hasAttribute('open');
+    }
+
+    function showDialog() {
+        if (dialog.showModal) {
+            dialog.showModal();
+        } else {
+            dialog.setAttribute('open', '');
+        }
+    }
+
+    function closeDialog() {
+        if (dialog.close) {
+            dialog.close();
+        } else if (isOpen()) {
+            dialog.removeAttribute('open');
+            dialog.dispatchEvent(new Event('close'));
+        }
+    }
+
+    // Element.replaceChildren needs Chrome 86 / Safari 14; append works far back.
+    function fill(parent, ...nodes) {
+        parent.textContent = '';
+        parent.append(...nodes);
+    }
+
+    function supportsSelector(selector) {
+        try {
+            document.querySelector(selector);
+            return true;
+        } catch (err) {
+            return false;
+        }
+    }
+
+    // Flexbox gap needs Chrome 84 / Safari 14.1; a column with a 1px gap is 1px tall where it works.
+    function supportsFlexGap() {
+        const probe = document.createElement('div');
+        probe.style.cssText = 'display:flex;flex-direction:column;row-gap:1px;position:absolute';
+        probe.append(document.createElement('div'), document.createElement('div'));
+        document.body.append(probe);
+        const supported = probe.scrollHeight === 1;
+        probe.remove();
+        return supported;
     }
 
     function profileButton(api, user, isCurrent) {
@@ -492,7 +573,7 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
         }
 
         if (user.Id === api.getCurrentUserId()) {
-            dialog.close();
+            closeDialog();
             return;
         }
 
@@ -515,7 +596,7 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
         }
 
         pending = { user, button };
-        authPanel.querySelector('.wiw-who').replaceChildren(profile(api, user, 'div'));
+        fill(authPanel.querySelector('.wiw-who'), profile(api, user, 'div'));
         authPanel.querySelector('.wiw-username').value = user.Name;
         authPanel.querySelector('.wiw-check').hidden = !canRemember(api) || isAdmin(user);
         authPanel.querySelector('.wiw-remember').checked = Boolean(token);
@@ -548,7 +629,7 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
     }
 
     function canAdd(api) {
-        return typeof createImageBitmap === 'function' && mayManageOwn(me(api));
+        return mayManageOwn(me(api));
     }
 
     // This browser's per-server memory. A value of the wrong shape (tampered or corrupt) is ignored,
@@ -768,8 +849,8 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
 
     async function openPictures(api, user) {
         editing = user;
-        picturesPanel.querySelector('.wiw-for').replaceChildren(profile(api, user, 'div'));
-        picturesPanel.querySelector('.wiw-gallery').replaceChildren();
+        fill(picturesPanel.querySelector('.wiw-for'), profile(api, user, 'div'));
+        fill(picturesPanel.querySelector('.wiw-gallery'));
         show(picturesPanel);
         setError('');
         await loadGallery(api);
@@ -818,7 +899,7 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
             items.push(empty);
         }
 
-        picturesPanel.querySelector('.wiw-gallery').replaceChildren(...items);
+        fill(picturesPanel.querySelector('.wiw-gallery'), ...items);
     }
 
     function galleryImage(api, id) {
@@ -840,8 +921,8 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
         const picture = document.createElement('span');
         picture.className = 'wiw-avatar';
         picture.append(galleryImage(api, id));
-        confirmPanel.querySelector('.wiw-old').replaceChildren(avatar(api, editing), caption(TEXT.currentPicture));
-        confirmPanel.querySelector('.wiw-new').replaceChildren(picture, caption(TEXT.newPicture));
+        fill(confirmPanel.querySelector('.wiw-old'), avatar(api, editing), caption(TEXT.currentPicture));
+        fill(confirmPanel.querySelector('.wiw-new'), picture, caption(TEXT.newPicture));
         show(confirmPanel);
         setError('');
         confirmPanel.querySelector('[data-action=apply]').focus();
@@ -882,7 +963,7 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
         setError('');
         let id;
         try {
-            const image = await createImageBitmap(file);
+            const image = await decode(file);
             const side = Math.min(image.width, image.height);
             const canvas = document.createElement('canvas');
             canvas.width = canvas.height = Math.min(side, 512);
@@ -913,6 +994,27 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
         }
     }
 
+    // createImageBitmap needs Safari 15; an <img> works everywhere.
+    function decode(file) {
+        if (typeof createImageBitmap === 'function') {
+            return createImageBitmap(file);
+        }
+
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            const url = URL.createObjectURL(file);
+            img.onload = () => {
+                URL.revokeObjectURL(url);
+                resolve(img);
+            };
+            img.onerror = () => {
+                URL.revokeObjectURL(url);
+                reject(new Error('not an image'));
+            };
+            img.src = url;
+        });
+    }
+
     function setBusy(value) {
         busy = value;
         dialog.setAttribute('aria-busy', String(value));
@@ -937,7 +1039,7 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
         if (e.key === 'Escape' || e.key === 'GoBack' || e.key === 'BrowserBack' || e.keyCode === 461) {
             e.preventDefault();
             if (!back()) {
-                dialog.close();
+                closeDialog();
             }
 
             return;

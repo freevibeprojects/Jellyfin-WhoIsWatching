@@ -1,0 +1,20 @@
+[
+  {
+    "guid": "2d627493-2b57-432a-b238-c22aaf9fd609",
+    "name": "Who's Watching",
+    "description": "Click your avatar in Jellyfin Web to open a Netflix-style \"Who's watching?\" screen and switch profile. Optional \"Remember on this device\" (never for administrators; keeps Jellyfin's access token, never a password), Manage profiles with a shared picture gallery, brand text, and a settings page. Sign-in goes through Jellyfin's own login API, so all of Jellyfin's rules apply.",
+    "overview": "Netflix-style profile switching from the avatar button in Jellyfin Web",
+    "owner": "freevibeprojects",
+    "category": "General",
+    "versions": [
+      {
+        "version": "1.2.1.0",
+        "changelog": "Works on older browsers and apps: Jellyfin Media Player's Chromium, Safari before 15.4, older WebViews and webOS (fallbacks for dialog, replaceChildren, createImageBitmap, :focus-visible, flexbox gap, aspect-ratio, clamp/max/env). Console notes explain when the avatar is left alone.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/freevibeprojects/Jellyfin-WhoIsWatching/main/releases/who-is-watching_1.2.1.0.zip",
+        "checksum": "623368f9a09b5d66688aeffb22d33307",
+        "timestamp": "2026-10-12T00:07:58Z"
+      }
+    ]
+  }
+]
