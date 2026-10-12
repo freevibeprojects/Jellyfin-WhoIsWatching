@@ -1,23 +1,31 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // End-to-end smoke test against a real Jellyfin server with the plugin installed.
 // Fixture (see setup.sh): Alice/alicepw, Bob/bobpw, Kid (no password) visible on the login
-// screen, Hidden hidden. Usage: node e2e.js [layout]   env: JF_URL, CHROMIUM, SCREENSHOTS
-const { chromium } = require('playwright-core');
+// screen, Hidden hidden. Usage: node e2e.js [layout]   env: JF_URL, CHROMIUM, FIREFOX (path to a
+// Playwright Firefox build: run in Gecko instead), OLD_ENGINE, SCREENSHOTS
+const { chromium, firefox } = require('playwright-core');
 const B = process.env.JF_URL || 'http://127.0.0.1:8096';
 const out = process.env.SCREENSHOTS || '.';
 const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process.exitCode = 1; };
 (async () => {
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/usr/bin/chromium', args: ['--no-sandbox'] });
+  const browser = process.env.FIREFOX
+    ? await firefox.launch({ executablePath: process.env.FIREFOX })
+    : await chromium.launch({ executablePath: process.env.CHROMIUM || '/usr/bin/chromium', args: ['--no-sandbox'] });
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   const bad = [];
   page.on('response', r => { if (r.status() >= 400) bad.push(r.status() + ' ' + r.request().method() + ' ' + r.url().replace(B, '')); });
-  page.on('console', m => { if ((m.type() === 'error' && !m.text().startsWith('Failed to load resource')) || m.text().includes('[WhoIsWatching]')) errors.push(m.text()); });
+  page.on('console', m => { if ((m.type() === 'error' && !m.text().startsWith('Failed to load resource')) || (m.type() === 'warning' && m.text().includes('[WhoIsWatching]'))) errors.push(m.text()); });
+  const notes = [];
+  page.on('console', m => { if (m.type() === 'info' && m.text().startsWith('[WhoIsWatching]')) notes.push(m.text()); });
   const auths = [];
   page.on('request', r => { if (/authenticatebyname/i.test(r.url())) auths.push(r.postData()); });
   const layout = process.argv[2]; // e.g. desktop-legacy, tv; default: the server's default layout
   if (layout) await page.addInitScript(l => localStorage.setItem('layout', l), layout);
+  // OLD_ENGINE=1: run everything without <dialog>, replaceChildren and createImageBitmap, like older
+  // Safari, WebViews and Jellyfin Media Player's Chromium, so the fallbacks are exercised.
+  if (process.env.OLD_ENGINE) await page.addInitScript(() => { delete window.HTMLDialogElement; delete Element.prototype.replaceChildren; delete window.createImageBitmap; });
   await page.goto(B + '/web/');
   await page.waitForFunction(() => window.ApiClient);
   await page.evaluate(() => window.ApiClient.authenticateUserByName('Alice', 'alicepw'));
@@ -37,7 +45,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
 
   errors.length = 0; // ignore the anonymous bootstrap before sign-in
   await avatar.click();
-  await page.waitForSelector('dialog.wiw[open]');
+  await page.waitForSelector('.wiw[open]');
   const names = await page.$$eval('.wiw-grid .wiw-name', els => els.map(e => e.textContent));
   ok(JSON.stringify(names) === '["Alice","Bob","Kid"]', 'grid shows public users only: ' + names);
   ok(await page.evaluate(() => document.activeElement.getAttribute('aria-label')) === 'Alice, current profile', 'focus starts on current profile');
@@ -51,11 +59,11 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   ok(await page.evaluate(() => document.activeElement.dataset.action) === 'account', 'ArrowRight moves to the gear (Account settings)');
   ok(await page.$eval('[data-action=account]', b => b.getAttribute('aria-label') === 'Account settings' && !!b.querySelector('svg')), 'Account settings is a gear icon');
   await page.keyboard.press('Escape');
-  ok(!(await page.$('dialog.wiw[open]')), 'Escape closes');
+  ok(!(await page.$('.wiw[open]')), 'Escape closes');
 
   // brand text from the plugin settings: by default "Jellyfin" in Jellyfin's purple, top left
   await avatar.click();
-  await page.waitForSelector('dialog.wiw[open]');
+  await page.waitForSelector('.wiw[open]');
   let b = await brand();
   ok(b.text === 'Jellyfin' && b.color === 'rgb(170, 92, 195)' && b.size === '40px' && b.left < 60 && b.top < 60, 'default brand text: ' + JSON.stringify(b));
   ok(!(await page.$('.wiw-grid .wiw-pencil')), 'no pencils on the profile grid');
@@ -96,7 +104,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   // brand text settings: text, colour, size and position
   await config({ BrandText: 'Family TV', BrandColor: '#FF8800', BrandSize: 56, BrandPosition: 'TopRight' });
   await avatar.click();
-  await page.waitForSelector('dialog.wiw[open]');
+  await page.waitForSelector('.wiw[open]');
   b = await brand();
   ok(b.text === 'Family TV' && b.color === 'rgb(255, 136, 0)' && b.size === '56px' && b.right < 150 && b.left > 300, 'custom brand text: ' + JSON.stringify(b));
   await config(defaults);
@@ -162,7 +170,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
     await page.click('.wiw-grid button[aria-label="Bob"]');
     await page.keyboard.press('Escape');
   }
-  ok(await page.evaluate(() => document.querySelector('dialog.wiw').open && !document.querySelector('.wiw-pick').hidden), 'Escape keeps returning to the grid, not closing the picker');
+  ok(await page.evaluate(() => document.querySelector('.wiw').hasAttribute('open') && !document.querySelector('.wiw-pick').hidden), 'Escape keeps returning to the grid, not closing the picker');
 
   // correct password switches and revokes old token
   await page.click('.wiw-grid button[aria-label="Bob"]');
@@ -230,7 +238,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.click('.wiw-grid button[aria-label^="Bob"]');
   ok(await page.waitForSelector('.wiw-pictures:not([hidden]) .wiw-add', { timeout: 5000 }).then(() => true, () => false), 'Bob may add pictures');
   for (let i = 0; i < 3; i++) await page.keyboard.press('Escape');
-  ok(!(await page.$('dialog.wiw[open]')), 'Escape steps back out of the pictures, Manage profiles, then the picker');
+  ok(!(await page.$('.wiw[open]')), 'Escape steps back out of the pictures, Manage profiles, then the picker');
 
   // gallery API: sign-in to list, images only, 1 MB cap, admins delete, adding needs "manage own preferences"
   const bobApi = await signIn('Bob', 'bobpw', 'e2e-bob');
@@ -244,6 +252,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   const rules = {
     anonymousList: (await fetch(B + '/WhoIsWatching/Images')).status === 401,
     notAnImage: (await post(bobApi, Buffer.from('<svg onload=alert(1)>'))).status === 400,
+    pngRefused: (await post(bobApi, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0]))).status === 400,
     tooBig: (await post(bobApi, Buffer.alloc(1024 * 1024 + 1, 0xff))).status === 413,
     added: added.status === 200,
     served: served.headers.get('content-type') === 'image/jpeg' && served.headers.get('x-content-type-options') === 'nosniff',
@@ -256,11 +265,11 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   ok(Object.values(rules).every(Boolean), 'gallery API rules: ' + JSON.stringify(rules));
 
   // if the picker can't be shown, the avatar keeps its original action
-  await page.evaluate(() => { window.showModal = HTMLDialogElement.prototype.showModal; HTMLDialogElement.prototype.showModal = () => { throw new Error('test'); }; });
+  await page.evaluate(() => { window.imageUrl = window.ApiClient.getUserImageUrl; window.ApiClient.getUserImageUrl = () => { throw new Error('test'); }; });
   await avatar.click();
   await page.waitForTimeout(1000);
-  ok(!(await page.$('dialog.wiw[open]')) && (page.url().includes('mypreferencesmenu') || await page.locator('#app-user-menu .MuiPaper-root').isVisible()), 'picker failure falls back to original action: ' + page.url());
-  await page.evaluate(() => { HTMLDialogElement.prototype.showModal = window.showModal; });
+  ok(!(await page.$('.wiw[open]')) && (page.url().includes('mypreferencesmenu') || await page.locator('#app-user-menu .MuiPaper-root').isVisible()), 'picker failure falls back to original action: ' + page.url());
+  await page.evaluate(() => { window.ApiClient.getUserImageUrl = window.imageUrl; });
   errors.splice(0, errors.length, ...errors.filter(e => !e.includes('could not show profiles')));
   await page.keyboard.press('Escape');
   await page.goto(B + '/web/#/home');
@@ -276,10 +285,12 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await avatar.waitFor();
   await page.setViewportSize({ width: 390, height: 844 });
   await avatar.click();
-  await page.waitForSelector('dialog.wiw[open]');
+  await page.waitForSelector('.wiw[open]');
   await page.waitForTimeout(400); await page.screenshot({ path: out + '/' + (layout || 'default') + '-3-mobile.png' });
   ok(JSON.stringify(bad) === '["401 POST /Users/authenticatebyname","401 GET /Users/Me"]', 'only HTTP errors are the wrong password and the ended session: ' + bad.join(', '));
   ok(errors.length === 0, 'no page errors: ' + errors.join(' | '));
+  ok(notes.some(n => /^\[WhoIsWatching\] \d+(\.\d+){3} loaded$/.test(n)), 'console says which version loaded: ' + notes[0]);
+  ok(!process.env.OLD_ENGINE || await page.evaluate(() => document.querySelector('.wiw').tagName === 'DIV'), 'old engine: the <div> stand-in was used');
 
   // signing out of Jellyfin forgets remembered profiles and ends their sessions
   const kidId = await page.evaluate(async () => (await window.ApiClient.getJSON(window.ApiClient.getUrl('Users/Public'))).find(u => u.Name === 'Kid').Id);

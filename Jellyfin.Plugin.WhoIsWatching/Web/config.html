@@ -57,7 +57,9 @@
                 function loadGallery() {
                     ApiClient.getJSON(ApiClient.getUrl('WhoIsWatching/Images')).then(function (ids) {
                         field('wiwGalleryCount').textContent = ids.length + ' of 200 pictures.';
-                        field('wiwGallery').replaceChildren.apply(field('wiwGallery'), ids.map(function (id) {
+                        var gallery = field('wiwGallery');
+                        gallery.textContent = '';
+                        ids.forEach(function (id) {
                             var item = document.createElement('div');
                             item.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:.5em';
                             var img = document.createElement('img');
@@ -74,8 +76,8 @@
                                 ApiClient.ajax({ type: 'DELETE', url: ApiClient.getUrl('WhoIsWatching/Images/' + id) }).then(loadGallery);
                             });
                             item.append(img, remove);
-                            return item;
-                        }));
+                            gallery.append(item);
+                        });
                     });
                 }
 

@@ -16,10 +16,12 @@ using Microsoft.AspNetCore.Mvc;
 namespace Jellyfin.Plugin.WhoIsWatching;
 
 /// <summary>
-/// The picker's brand settings and the shared profile-picture gallery. Pictures are files named by
-/// a server-made GUID in plugins/configurations/WhoIsWatching/images, so no client-supplied name
+/// The picker's brand settings and the shared profile-picture gallery. Pictures are JPEG files named
+/// by a server-made GUID in plugins/configurations/WhoIsWatching/images, so no client-supplied name
 /// ever reaches the file system. Choosing a picture copies it to the user through Jellyfin's own
 /// user-image API, which applies Jellyfin's permission checks; deleting one here leaves those copies.
+/// Only JPEG is accepted (the picker always sends JPEG): every profile's browser decodes these files,
+/// and fewer decoders mean less attack surface (WebP's had remote code execution, CVE-2023-4863).
 /// </summary>
 [ApiController]
 [Route("WhoIsWatching")]
@@ -28,13 +30,6 @@ public sealed partial class GalleryController : ControllerBase
     // The client sends a 512 px JPEG (typically under 150 KB); the caps bound what one user can store.
     private const int MaxImageBytes = 1024 * 1024;
     private const int MaxImages = 200;
-
-    private static readonly Dictionary<string, string> ContentTypes = new()
-    {
-        [".jpg"] = "image/jpeg",
-        [".png"] = "image/png",
-        [".webp"] = "image/webp"
-    };
 
     private readonly IUserManager _userManager;
     private readonly string _folder;
@@ -74,7 +69,7 @@ public sealed partial class GalleryController : ControllerBase
     [HttpGet("Images")]
     [Authorize]
     public IEnumerable<string> GetImages()
-        => Pictures().OrderByDescending(p => System.IO.File.GetLastWriteTimeUtc(p.Path)).Select(p => p.Id).ToList();
+        => Pictures().OrderByDescending(System.IO.File.GetLastWriteTimeUtc).Select(path => Path.GetFileNameWithoutExtension(path)!).ToList();
 
     /// <summary>
     /// Gets a gallery picture. Anonymous like Jellyfin's own user images, since an img tag can't send a
@@ -86,8 +81,8 @@ public sealed partial class GalleryController : ControllerBase
     [AllowAnonymous]
     public ActionResult GetImage(Guid id)
     {
-        var picture = Pictures().FirstOrDefault(p => p.Id == id.ToString("N"));
-        if (picture.Path is null)
+        var path = PathOf(id);
+        if (!System.IO.File.Exists(path))
         {
             return NotFound();
         }
@@ -97,11 +92,11 @@ public sealed partial class GalleryController : ControllerBase
         Response.Headers.CacheControl = "public, max-age=31536000, immutable";
         Response.Headers.XContentTypeOptions = "nosniff";
         Response.Headers.ContentSecurityPolicy = "default-src 'none'; sandbox";
-        return PhysicalFile(picture.Path, ContentTypes[Path.GetExtension(picture.Path)]);
+        return PhysicalFile(path, "image/jpeg");
     }
 
     /// <summary>
-    /// Adds a picture to the gallery: a JPEG, PNG or WebP body of at most 1 MB. Allowed for anyone who
+    /// Adds a picture to the gallery: a JPEG body of at most 1 MB. Allowed for anyone who
     /// may change their own profile picture in Jellyfin.
     /// </summary>
     /// <returns>The new picture's ID.</returns>
@@ -114,7 +109,13 @@ public sealed partial class GalleryController : ControllerBase
             return StatusCode(StatusCodes.Status403Forbidden);
         }
 
-        var data = new byte[MaxImageBytes + 1];
+        if (Request.ContentLength > MaxImageBytes)
+        {
+            return StatusCode(StatusCodes.Status413PayloadTooLarge);
+        }
+
+        // Sized from Content-Length (Kestrel enforces it) so a typical 100 KB upload doesn't take 1 MB.
+        var data = new byte[Math.Min(Request.ContentLength ?? MaxImageBytes, MaxImageBytes) + 1];
         var length = 0;
         int read;
         while (length < data.Length && (read = await Request.Body.ReadAsync(data.AsMemory(length), HttpContext.RequestAborted).ConfigureAwait(false)) > 0)
@@ -127,10 +128,9 @@ public sealed partial class GalleryController : ControllerBase
             return StatusCode(StatusCodes.Status413PayloadTooLarge);
         }
 
-        var extension = Sniff(data.AsSpan(0, length));
-        if (extension is null)
+        if (!data.AsSpan(0, length).StartsWith((ReadOnlySpan<byte>)[0xFF, 0xD8, 0xFF]))
         {
-            return BadRequest("Not a JPEG, PNG or WebP image.");
+            return BadRequest("Not a JPEG image.");
         }
 
         Directory.CreateDirectory(_folder);
@@ -139,11 +139,20 @@ public sealed partial class GalleryController : ControllerBase
             return Conflict("The gallery is full. Remove pictures in the plugin's settings.");
         }
 
-        var id = Guid.NewGuid().ToString("N");
-        var path = Path.Combine(_folder, id + extension);
-        await System.IO.File.WriteAllBytesAsync(path + ".tmp", data.AsMemory(0, length), HttpContext.RequestAborted).ConfigureAwait(false);
-        System.IO.File.Move(path + ".tmp", path);
-        return Ok(new { Id = id });
+        var id = Guid.NewGuid();
+        var path = PathOf(id);
+        try
+        {
+            await System.IO.File.WriteAllBytesAsync(path + ".tmp", data.AsMemory(0, length), HttpContext.RequestAborted).ConfigureAwait(false);
+            System.IO.File.Move(path + ".tmp", path);
+        }
+        finally
+        {
+            // An aborted upload must not leave files behind that the 200-picture cap doesn't count.
+            System.IO.File.Delete(path + ".tmp");
+        }
+
+        return Ok(new { Id = id.ToString("N") });
     }
 
     /// <summary>
@@ -155,21 +164,22 @@ public sealed partial class GalleryController : ControllerBase
     [Authorize(Policy = Policies.RequiresElevation)]
     public ActionResult DeleteImage(Guid id)
     {
-        var picture = Pictures().FirstOrDefault(p => p.Id == id.ToString("N"));
-        if (picture.Path is null)
+        var path = PathOf(id);
+        if (!System.IO.File.Exists(path))
         {
             return NotFound();
         }
 
-        System.IO.File.Delete(picture.Path);
+        System.IO.File.Delete(path);
         return NoContent();
     }
 
-    private IEnumerable<(string Id, string Path)> Pictures()
+    // The ID is a parsed GUID, so the path can't leave the folder.
+    private string PathOf(Guid id) => Path.Combine(_folder, id.ToString("N") + ".jpg");
+
+    private IEnumerable<string> Pictures()
         => Directory.Exists(_folder)
-            ? Directory.EnumerateFiles(_folder)
-                .Select(path => (Id: Path.GetFileNameWithoutExtension(path), Path: path))
-                .Where(p => Guid.TryParseExact(p.Id, "N", out _) && ContentTypes.ContainsKey(Path.GetExtension(p.Path)))
+            ? Directory.EnumerateFiles(_folder, "*.jpg").Where(path => Guid.TryParseExact(Path.GetFileNameWithoutExtension(path), "N", out _))
             : [];
 
     // The same rule Jellyfin applies to changing your own profile picture. The role and claim names
@@ -178,21 +188,6 @@ public sealed partial class GalleryController : ControllerBase
         => User.IsInRole("Administrator")
             || (Guid.TryParse(User.FindFirst("Jellyfin-UserId")?.Value, out var userId)
                 && _userManager.GetUserById(userId) is { EnableUserPreferenceAccess: true });
-
-    private static string? Sniff(ReadOnlySpan<byte> data)
-    {
-        if (data.StartsWith((ReadOnlySpan<byte>)[0xFF, 0xD8, 0xFF]))
-        {
-            return ".jpg";
-        }
-
-        if (data.StartsWith((ReadOnlySpan<byte>)[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]))
-        {
-            return ".png";
-        }
-
-        return data.Length > 12 && data[..4].SequenceEqual("RIFF"u8) && data[8..12].SequenceEqual("WEBP"u8) ? ".webp" : null;
-    }
 
     [GeneratedRegex("^#[0-9A-Fa-f]{6}$")]
     private static partial Regex ColorPattern();

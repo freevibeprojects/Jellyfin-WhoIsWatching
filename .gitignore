@@ -2,4 +2,5 @@ bin/
 obj/
 artifacts/
 *.zip
+!releases/*.zip
 node_modules/

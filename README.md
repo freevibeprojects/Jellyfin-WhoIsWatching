@@ -4,8 +4,10 @@ A Netflix-style **"Who's watching?"** profile switcher inside Jellyfin Web. Clic
 in the top bar, pick a profile, enter its password if needed, and you are now that user.
 
 - Jellyfin **12.0+** (built against 12.0.0, tested on 12.2.0)
-- Server side: one ~80 KB DLL with no dependencies, no background work and no database. A settings page in the dashboard; the shared picture gallery is plain files.
-- Client side: one 45 KB script (13 KB compressed), loaded once and idle until the avatar is clicked
+- Server side: one ~85 KB DLL with no dependencies, no background work and no database. A settings page in the dashboard; the shared picture gallery is plain files.
+- Client side: one 50 KB script (14 KB compressed), loaded once and idle until the avatar is clicked
+
+**Install:** add `https://raw.githubusercontent.com/freevibeprojects/Jellyfin-WhoIsWatching/main/manifest.json` as a repository in *Dashboard → Plugins → Manage Repositories*, then install **Who's Watching** from *Available*. See [Install](#install).
 
 ## How it works
 
@@ -69,11 +71,26 @@ The plugin only works where the server's own Jellyfin Web UI runs, because that 
 | Client | Status |
 |---|---|
 | Jellyfin Web in a browser (modern, legacy and TV layouts) | Supported; all three layouts tested end to end |
-| Jellyfin Desktop / Jellyfin Media Player, Jellyfin Android (web UI mode), Jellyfin for webOS | Expected to work: they load the server's web UI. Not tested. webOS needs Chromium 55+ (webOS 5 or newer). |
+| Jellyfin Desktop / Jellyfin Media Player, the Jellyfin Android app, Jellyfin for webOS | Supported: they load the server's web UI (the Android app only swaps jellyfin-web's main bundle). Tested through browser emulation and with the fallbacks below forced on, not on the devices themselves. |
 | Jellyfin for Tizen | Not supported: it bundles its own copy of jellyfin-web |
 | Android TV, Swiftfin, Findroid, Streamyfin, Kodi, Infuse, other native apps | Not supported: they don't run Jellyfin Web |
 
-Browser requirements: `<dialog>` and ES2017 (Chrome/Edge 55+, Firefox 98+, Safari 15.4+). Older engines skip the plugin and the avatar keeps its normal behaviour.
+Engine requirements: ES2017 (`async`/`await`), which means Chrome/Edge/WebView 55+, Firefox 52+, Safari 11+ (iOS 11+) and webOS 5+. Newer features have fallbacks, so older engines get the full picker:
+- `<dialog>`: a full-screen stand-in for Safari before 15.4 and old WebViews
+- `replaceChildren`, `createImageBitmap`
+- `:focus-visible`: `:focus` instead, so TV remotes still show the highlight
+- flexbox `gap`, `aspect-ratio`, `clamp()`/`max()`/`env()`
+
+The end-to-end test runs once more with these APIs removed (`OLD_ENGINE=1`).
+
+### If the avatar still shows its normal menu
+
+1. **Reload the page after installing or updating.** The script is added when Jellyfin Web loads, and an open page keeps running without it, even across a server restart.
+   - Browsers: press F5.
+   - Jellyfin Desktop / Media Player: restart the app.
+   - **Android app: swipe it away (or Force stop) and reopen it.** It keeps its page loaded in the background.
+2. **Another profile must be visible to the signed-in user.** The picker lists the profiles the sign-in screen shows, plus yourself. If every other account has *Hide this user from login screens* ticked (Jellyfin 12's default for new users), there is nothing to switch to and the avatar keeps its normal action. Fix it in *Dashboard → Users → (user) → Profile*.
+3. **Check the console** (F12 in browsers). `[WhoIsWatching] 1.2.1.0 loaded` confirms the script is there, and a second `[WhoIsWatching]` line says why the avatar was left alone.
 
 ## Compatibility surface
 
@@ -101,7 +118,7 @@ After a Jellyfin upgrade, run the smoke test (below) to check all of these at on
 - User names and the brand text are only ever inserted with `textContent`. The brand settings are validated on the server: a `#RRGGBB` colour, 12–120 px, one of three positions, at most 40 characters.
 - Picture gallery (`/WhoIsWatching/Images`):
   - Listing needs a signed-in user. Each picture is served anonymously by its random ID, because an `<img>` can't send a token; Jellyfin serves user pictures the same way.
-  - Adding needs *Allow this user to manage their own preferences*. Only JPEG, PNG and WebP are accepted, checked by their bytes, at most 1 MB each and 200 in total.
+  - Adding needs *Allow this user to manage their own preferences*. Only JPEG is accepted (the picker re-encodes every upload to JPEG, which also drops location data from photos), checked by its bytes, at most 1 MB each and 200 in total. Every profile's browser shows these pictures, so other image formats (WebP's decoder had a remote-code-execution bug, CVE-2023-4863) are refused.
   - Files are named by the server (a new GUID), so nothing a client sends becomes a path. They are served with `X-Content-Type-Options: nosniff` and a sandboxing `Content-Security-Policy`.
   - Only administrators can delete.
   - Profile pictures are applied through Jellyfin's own API, so Jellyfin's permission checks decide who may change whose picture.
@@ -116,20 +133,39 @@ After a Jellyfin upgrade, run the smoke test (below) to check all of these at on
 - If **Remember me** was unticked at sign-in, Jellyfin forgets the session on any page reload. Switching reloads the page, so those users land on the login screen.
 - Jellyfin serves profile pictures at their uploaded size: it ignores size options for user images, so the login page downloads them in full too. Pictures added through the picker's gallery are shrunk first; ones uploaded in the dashboard are not, so a multi-megabyte phone photo set there is downloaded in full the first time the picker opens.
 
-## Build and install
+## Install
+
+On a Jellyfin 12.x server:
+
+1. Go to *Dashboard → Plugins*, then **Manage Repositories** → **New Repository**.
+2. Enter any name (for example `Who's Watching`) and this URL, then **Add**:
+   ```
+   https://raw.githubusercontent.com/freevibeprojects/Jellyfin-WhoIsWatching/main/manifest.json
+   ```
+3. Back in *Plugins*, open **Available**, choose **Who's Watching**, and **Install**.
+4. Restart Jellyfin (*Dashboard → Restart*), then reload every client (see *If the avatar still shows its normal menu* above). On Android, swipe the app away and reopen it.
+
+New versions appear as updates in *Dashboard → Plugins*, and Jellyfin's *Update Plugins* scheduled task installs them.
+
+Upgrading from a manual install: delete the old `WhoIsWatching_*` folder from the plugins directory first, so only the repository's copy is loaded.
+
+### Build from source
 
 ```sh
 dotnet build Jellyfin.Plugin.WhoIsWatching -c Release
 # copy bin/Release/net10.0/Jellyfin.Plugin.WhoIsWatching.dll to
-#   <jellyfin data dir>/plugins/WhoIsWatching_1.2.0.0/
-# then restart Jellyfin
+#   <jellyfin data dir>/plugins/WhoIsWatching/ and restart Jellyfin
 ```
-
-`build.yaml` is a [jprm](https://github.com/oddstr13/jellyfin-plugin-repository-manager) manifest for publishing to a plugin repository.
 
 Some Linux-distro .NET SDKs ship without the ASP.NET Core targeting pack and fail with
 `NETSDK1226: Prune Package data not found`. Install the `aspnet-targeting-pack` package, or build with
 `-p:AllowMissingPrunePackageData=true`.
+
+### Publishing a release
+
+1. Bump `<Version>` in the `.csproj` and `version` in `build.yaml`, and write the `changelog` there. The client script is cached by version, so every change needs a new one.
+2. Run `./release.sh`. It builds `releases/who-is-watching_<version>.zip` (no debug info or local paths) and adds it, with its MD5 checksum, to `manifest.json`. The catalog text comes from `build.yaml`.
+3. Commit and push. Servers see the update from the repository URL.
 
 ## Smoke test
 
@@ -150,6 +186,7 @@ Some Linux-distro .NET SDKs ship without the ASP.NET Core targeting pack and fai
 cd test && npm install
 JF_URL=http://127.0.0.1:8096 ./setup.sh        # fresh server, wizard not yet run
 node e2e.js && node e2e.js desktop-legacy && node e2e.js tv
+OLD_ENGINE=1 node e2e.js     # again without <dialog>, replaceChildren and createImageBitmap
 ```
 
 ## License
