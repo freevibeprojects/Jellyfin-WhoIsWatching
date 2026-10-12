@@ -40,12 +40,20 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   const config = c => fetch(B + '/Plugins/2d627493-2b57-432a-b238-c22aaf9fd609/Configuration', { method: 'POST', headers: { ...auth(adminToken), 'Content-Type': 'application/json' }, body: JSON.stringify(c) });
   const defaults = { BrandText: 'Jellyfin', BrandColor: '#AA5CC3', BrandSize: 40, BrandPosition: 'TopLeft' };
   await config(defaults);
-  const brand = () => page.$eval('.wiw-brand', el => { const r = el.getBoundingClientRect(); const c = getComputedStyle(el); return { text: el.hidden ? '' : el.textContent, color: c.color, size: c.fontSize, left: Math.round(r.left), right: Math.round(innerWidth - r.right), top: Math.round(r.top) }; });
+  const brand = () => page.$eval('.wiw-brand', el => { const r = el.getBoundingClientRect(); const c = getComputedStyle(el); return { text: el.hidden ? '' : el.textContent, color: c.color, size: c.fontSize, base: getComputedStyle(el.parentNode).fontSize, left: Math.round(r.left), right: Math.round(innerWidth - r.right), top: Math.round(r.top) }; });
   const remembered = () => page.evaluate(() => JSON.parse(localStorage.getItem('whoiswatching-remembered-' + window.ApiClient.serverId()) || '{}'));
 
   errors.length = 0; // ignore the anonymous bootstrap before sign-in
-  await avatar.click();
+  // pressing the avatar already loads the profiles, so the picker opens as the click lands
+  let profileLoads = 0;
+  page.on('request', r => { if (/Users\/Public/i.test(r.url())) profileLoads++; });
+  await avatar.hover();
+  await page.mouse.down();
+  await page.waitForTimeout(300);
+  const whilePressed = profileLoads;
+  await page.mouse.up();
   await page.waitForSelector('.wiw[open]');
+  ok(whilePressed === 1 && profileLoads === 1, `pressing the avatar preloads the profiles (${whilePressed} while pressed, ${profileLoads} in all)`);
   const names = await page.$$eval('.wiw-grid .wiw-name', els => els.map(e => e.textContent));
   ok(JSON.stringify(names) === '["Alice","Bob","Kid"]', 'grid shows public users only: ' + names);
   ok(await page.evaluate(() => document.activeElement.getAttribute('aria-label')) === 'Alice, current profile', 'focus starts on current profile');
@@ -65,7 +73,9 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await avatar.click();
   await page.waitForSelector('.wiw[open]');
   let b = await brand();
-  ok(b.text === 'Jellyfin' && b.color === 'rgb(170, 92, 195)' && b.size === '40px' && b.left < 60 && b.top < 60, 'default brand text: ' + JSON.stringify(b));
+  // The brand size is pixels at 1080p (a 16px base) and scales with the picker.
+  const scaled = (b, px) => Math.abs(parseFloat(b.size) - px * parseFloat(b.base) / 16) < 0.1;
+  ok(b.text === 'Jellyfin' && b.color === 'rgb(170, 92, 195)' && scaled(b, 40) && b.left < 60 && b.top < 60, 'default brand text: ' + JSON.stringify(b));
   ok(!(await page.$('.wiw-grid .wiw-pencil')), 'no pencils on the profile grid');
 
   // Manage profiles, like Netflix: pencils only in this mode; administrators may change every profile
@@ -106,7 +116,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await avatar.click();
   await page.waitForSelector('.wiw[open]');
   b = await brand();
-  ok(b.text === 'Family TV' && b.color === 'rgb(255, 136, 0)' && b.size === '56px' && b.right < 150 && b.left > 300, 'custom brand text: ' + JSON.stringify(b));
+  ok(b.text === 'Family TV' && b.color === 'rgb(255, 136, 0)' && scaled(b, 56) && b.right < 150 && b.left > 300, 'custom brand text: ' + JSON.stringify(b));
   await config(defaults);
   await page.keyboard.press('Escape');
 
@@ -287,6 +297,19 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await avatar.click();
   await page.waitForSelector('.wiw[open]');
   await page.waitForTimeout(400); await page.screenshot({ path: out + '/' + (layout || 'default') + '-3-mobile.png' });
+
+  // scales with the screen: profiles are 4/3 as big at 1440p and twice as big at 4K as at 1080p,
+  // and nothing overflows sideways at any size
+  const measure = async (width, height) => {
+    await page.setViewportSize({ width, height });
+    return page.evaluate(() => { const d = document.querySelector('.wiw'); return { tile: document.querySelector('.wiw-grid .wiw-profile').getBoundingClientRect().width, fits: d.scrollWidth <= d.clientWidth }; });
+  };
+  const sizes = [await measure(1920, 1080), await measure(2560, 1440), await measure(3840, 2160), await measure(390, 844), await measure(1366, 768)];
+  await page.screenshot({ path: out + '/' + (layout || 'default') + '-6-1366.png' });
+  await measure(2560, 1440); await page.waitForTimeout(300);
+  await page.screenshot({ path: out + '/' + (layout || 'default') + '-7-1440p.png' });
+  ok(Math.abs(sizes[1].tile / sizes[0].tile - 4 / 3) < 0.02 && Math.abs(sizes[2].tile / sizes[0].tile - 2) < 0.02 && sizes.every(x => x.fits),
+    'picker scales with the screen: ' + sizes.map(x => Math.round(x.tile) + (x.fits ? '' : ' (overflows)')).join(' / ') + 'px');
   ok(JSON.stringify(bad) === '["401 POST /Users/authenticatebyname","401 GET /Users/Me"]', 'only HTTP errors are the wrong password and the ended session: ' + bad.join(', '));
   ok(errors.length === 0, 'no page errors: ' + errors.join(' | '));
   ok(notes.some(n => /^\[WhoIsWatching\] \d+(\.\d+){3} loaded$/.test(n)), 'console says which version loaded: ' + notes[0]);

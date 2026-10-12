@@ -1,7 +1,7 @@
 ---
 name: "Who's Watching"
 guid: "2d627493-2b57-432a-b238-c22aaf9fd609"
-version: "1.2.1.0"
+version: "1.3.0.0"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 overview: "Netflix-style profile switching from the avatar button in Jellyfin Web"
@@ -15,7 +15,7 @@ owner: "freevibeprojects"
 artifacts:
   - "Jellyfin.Plugin.WhoIsWatching.dll"
 changelog: >
-  Works on older browsers and apps: Jellyfin Media Player's Chromium, Safari before 15.4,
-  older WebViews and webOS (fallbacks for dialog, replaceChildren, createImageBitmap,
-  :focus-visible, flexbox gap, aspect-ratio, clamp/max/env). Console notes explain when
-  the avatar is left alone.
+  The picker scales with the screen: the same proportions from phones and 1080p up to 1440p
+  and 4K, limited by height on wide or short windows (the brand-text size is now pixels at
+  1080p and scales too). Older engines keep the fixed 1080p sizes. Pressing the avatar starts
+  loading the profiles, so the picker opens as the click lands.

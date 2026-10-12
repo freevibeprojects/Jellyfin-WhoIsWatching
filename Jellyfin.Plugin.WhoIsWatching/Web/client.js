@@ -62,31 +62,32 @@
     const ICON_ADD = 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z';
     const ICON_ARROW = 'M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z';
 
-    // --wiw-accent and --wiw-on-accent are set from the current theme each time the picker opens.
-    // Plain values come before modern ones (clamp, max, env) so older engines (Jellyfin Media Player's
-    // Chromium, older Safari and webOS) keep a working layout; .wiw-nogap stands in for flexbox gap.
+    // Everything scales with --u: 16px at 1080p, growing with the screen (21px at 1440p, 32px at 4K),
+    // limited by height so wide or short windows still fit; phones are guarded with vw. Engines
+    // without clamp()/min() keep --u at 16px. --wiw-accent and --wiw-on-accent come from the theme
+    // each time the picker opens; .wiw-nogap stands in for flexbox gap on older engines.
     const CSS = `
-.wiw{position:fixed;top:0;right:0;bottom:0;left:0;z-index:2147483647;width:100%;height:100%;max-width:none;max-height:none;margin:0;border:0;padding:16px;
- padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));
+.wiw{--u:16px;position:fixed;top:0;right:0;bottom:0;left:0;z-index:2147483647;width:100%;height:100%;max-width:none;max-height:none;margin:0;border:0;
+ padding:var(--u);
  box-sizing:border-box;overflow:auto;background:var(--jf-palette-background-default,#101010);
- color:var(--jf-palette-text-primary,#fff);font:inherit;animation:wiw-in .18s ease-out}
+ color:var(--jf-palette-text-primary,#fff);font:inherit;font-size:var(--u);animation:wiw-in .18s ease-out}
 .wiw[open]{display:flex}
 .wiw:not([open]){display:none}
 .wiw::backdrop{background:var(--jf-palette-background-default,#101010)}
 .wiw[aria-busy=true]{cursor:progress}
 .wiw-panel{margin:auto;display:flex;flex-direction:column;align-items:center;gap:2em;text-align:center;max-width:64em}
 .wiw-panel[hidden]{display:none}
-.wiw-title{margin:0;font-size:2.2rem;font-size:clamp(1.6rem,4vw,3rem);font-weight:500}
-.wiw-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(1rem,2.5vw,2rem);margin:0;padding:0;list-style:none}
-.wiw-profile{display:flex;flex-direction:column;align-items:center;gap:.7em;width:7.5rem;width:clamp(5.5rem,11vw,9rem);padding:0;border:0;
+.wiw-title{margin:0;font-size:3em;font-weight:500}
+.wiw-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:calc(2 * var(--u));margin:0;padding:0;list-style:none}
+.wiw-profile{display:flex;flex-direction:column;align-items:center;gap:.7em;width:calc(9 * var(--u));padding:0;border:0;
  background:none;color:var(--jf-palette-text-secondary,rgba(255,255,255,.7));font:inherit;cursor:pointer;outline:none}
 .wiw-avatar{position:relative;display:grid;place-items:center;width:100%;aspect-ratio:1;overflow:hidden;border-radius:12%;
- background:var(--wiw-color);color:#fff;font-size:2.8rem;font-size:clamp(2rem,5vw,3.5rem);font-weight:500;
+ background:var(--wiw-color);color:#fff;font-size:calc(3.5 * var(--u));font-weight:500;
  box-shadow:0 0 0 0 transparent;transition:box-shadow .15s,transform .15s}
 .wiw-avatar img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover}
-.wiw-profile[aria-current=true] .wiw-avatar{box-shadow:0 0 0 3px var(--wiw-accent,#00a4dc)}
+.wiw-profile[aria-current=true] .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u)) var(--wiw-accent,#00a4dc)}
 button.wiw-profile:hover,button.wiw-profile:focus-visible{color:var(--jf-palette-text-primary,#fff)}
-button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 3px var(--jf-palette-text-primary,#fff);transform:scale(1.04)}
+button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u)) var(--jf-palette-text-primary,#fff);transform:scale(1.04)}
 .wiw-busy .wiw-avatar{animation:wiw-pulse 1s ease-in-out infinite}
 .wiw-name{display:flex;align-items:center;gap:.3em;max-width:100%;font-size:1.05em;word-break:break-word;overflow-wrap:anywhere}
 .wiw svg{width:1em;height:1em;flex:none;fill:currentColor}
@@ -97,33 +98,33 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
 .wiw-primary:hover,.wiw-primary:focus-visible{border-color:var(--jf-palette-text-primary,#fff);color:var(--wiw-on-accent,#fff)}
 .wiw-button:focus-visible,.wiw-close:focus-visible,.wiw-input:focus-visible,.wiw-remember:focus-visible{outline:2px solid var(--wiw-accent,#00a4dc);outline-offset:2px}
 .wiw button:disabled,.wiw input:disabled{cursor:progress}
-.wiw-close{position:absolute;top:12px;right:12px;top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));display:grid;place-items:center;
- width:2.75em;height:2.75em;padding:0;border:0;border-radius:50%;background:none;color:inherit;font-size:1.2em;cursor:pointer}
+.wiw-close{position:absolute;top:calc(.75 * var(--u));right:calc(.75 * var(--u));
+ display:grid;place-items:center;width:2.75em;height:2.75em;padding:0;border:0;border-radius:50%;background:none;color:inherit;font-size:1.2em;cursor:pointer}
 .wiw-close:hover{background:var(--jf-palette-action-hover,rgba(255,255,255,.08))}
 .wiw-icon{display:grid;place-items:center;width:2em;height:2em;padding:0;border:0;border-radius:50%;background:none;
  color:var(--jf-palette-text-secondary,rgba(255,255,255,.7));font-size:1.6em;cursor:pointer;outline:none;transition:transform .2s,color .2s}
 .wiw-icon:hover,.wiw-icon:focus-visible{color:var(--wiw-accent,#00a4dc);transform:scale(1.25)}
-.wiw-brand{position:absolute;top:16px;left:24px;top:max(16px,env(safe-area-inset-top));left:max(24px,env(safe-area-inset-left));margin:0;
- font-size:var(--wiw-brand-size,40px);font-weight:700;line-height:1;white-space:nowrap}
+.wiw-brand{position:absolute;top:var(--u);left:calc(1.5 * var(--u));margin:0;
+ font-size:calc(var(--wiw-brand-size,40) * var(--u) / 16);font-weight:700;line-height:1;white-space:nowrap}
 .wiw-brand[data-position=TopCenter]{left:50%;transform:translateX(-50%)}
-.wiw-brand[data-position=TopRight]{left:auto;right:4.5rem;right:calc(max(12px,env(safe-area-inset-right)) + 3.5rem)}
+.wiw-brand[data-position=TopRight]{left:auto;right:calc(4.4 * var(--u))}
 .wiw-brand[hidden]{display:none}
-.wiw-branded{padding-top:calc(16px + var(--wiw-brand-size,40px) + 1rem);padding-top:calc(max(16px,env(safe-area-inset-top)) + var(--wiw-brand-size,40px) + 1rem)}
+.wiw-branded{padding-top:calc(2 * var(--u) + var(--wiw-brand-size,40) * var(--u) / 16)}
 .wiw-pencil{position:absolute;top:0;left:0;width:100%;height:100%;display:grid;place-items:center;background:rgba(0,0,0,.55);color:#fff;font-size:.5em}
 .wiw-pencil svg{padding:.35em;border:2px solid;border-radius:50%}
 .wiw-new .wiw-avatar{background:var(--jf-palette-background-paper,#202020)}
 .wiw-profile[aria-disabled=true]{opacity:.35;cursor:default}
-.wiw-for .wiw-profile{width:5rem;font-size:.9rem}
-.wiw-for .wiw-avatar{font-size:2rem}
-.wiw-gallery{display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(.75rem,2vw,1.25rem);margin:0;padding:0;list-style:none}
-.wiw-tile{position:relative;display:grid;place-items:center;width:6rem;width:clamp(4.5rem,9vw,7rem);aspect-ratio:1;padding:0;border:0;border-radius:12%;overflow:hidden;
+.wiw-for .wiw-profile{width:calc(5 * var(--u));font-size:.9em}
+.wiw-for .wiw-avatar{font-size:calc(2 * var(--u))}
+.wiw-gallery{display:flex;flex-wrap:wrap;justify-content:center;gap:calc(1.25 * var(--u));margin:0;padding:0;list-style:none}
+.wiw-tile{position:relative;display:grid;place-items:center;width:calc(7 * var(--u));aspect-ratio:1;padding:0;border:0;border-radius:12%;overflow:hidden;
  background:var(--jf-palette-background-paper,#202020);color:var(--jf-palette-text-secondary,rgba(255,255,255,.7));font-size:2.2em;cursor:pointer;outline:none;transition:box-shadow .15s,transform .15s}
 .wiw-tile img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover}
-.wiw-tile:hover,.wiw-tile:focus-visible{box-shadow:0 0 0 3px var(--wiw-accent,#00a4dc);transform:scale(1.06)}
+.wiw-tile:hover,.wiw-tile:focus-visible{box-shadow:0 0 0 calc(.19 * var(--u)) var(--wiw-accent,#00a4dc);transform:scale(1.06)}
 .wiw-add{border:2px dashed currentColor}
 .wiw-add:hover,.wiw-add:focus-visible{color:var(--wiw-accent,#00a4dc)}
-.wiw-compare{display:flex;align-items:center;gap:clamp(1rem,4vw,3rem)}
-.wiw-compare figure{display:flex;flex-direction:column;align-items:center;gap:.7em;width:8rem;width:clamp(6rem,14vw,10rem);margin:0;color:var(--jf-palette-text-secondary,rgba(255,255,255,.7))}
+.wiw-compare{display:flex;align-items:center;gap:calc(3 * var(--u))}
+.wiw-compare figure{display:flex;flex-direction:column;align-items:center;gap:.7em;width:calc(10 * var(--u));margin:0;color:var(--jf-palette-text-secondary,rgba(255,255,255,.7))}
 .wiw-compare>svg{font-size:2em}
 .wiw-auth .wiw-profile{cursor:default;color:var(--jf-palette-text-primary,#fff)}
 .wiw-field{display:flex;flex-direction:column;align-items:stretch;gap:.4em;width:20em;max-width:80vw;text-align:start;color:var(--jf-palette-text-secondary,rgba(255,255,255,.7))}
@@ -136,11 +137,29 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
 .wiw-remember{width:1.2em;height:1.2em;margin:0;accent-color:var(--wiw-accent,#00a4dc)}
 .wiw-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:1em}
 .wiw-error{min-height:1.5em;margin:-1em 0 0;color:var(--jf-palette-error-light,#ef5350)}
+/* Modern engines: scale with the screen and keep clear of notches. A declaration using var() can't fall
+   back to an earlier one, so max()/env() live only here. */
+@supports (width:clamp(1px,min(1vw,1vh),2px)){
+ .wiw{--u:clamp(15px,min(.8333vw,1.4815vh),64px);
+  padding:max(var(--u),env(safe-area-inset-top)) max(var(--u),env(safe-area-inset-right)) max(var(--u),env(safe-area-inset-bottom)) max(var(--u),env(safe-area-inset-left))}
+ .wiw-branded{padding-top:calc(max(var(--u),env(safe-area-inset-top)) + var(--u) + var(--wiw-brand-size,40) * var(--u) / 16)}
+ .wiw-close{top:max(calc(.75 * var(--u)),env(safe-area-inset-top));right:max(calc(.75 * var(--u)),env(safe-area-inset-right))}
+ .wiw-brand{top:max(var(--u),env(safe-area-inset-top));left:max(calc(1.5 * var(--u)),env(safe-area-inset-left))}
+ .wiw-brand[data-position=TopRight]{right:calc(max(calc(.75 * var(--u)),env(safe-area-inset-right)) + 3.65 * var(--u))}
+ .wiw-title{font-size:min(3em,8vw)}
+ .wiw-grid{gap:min(calc(2 * var(--u)),4vw)}
+ .wiw-profile{width:min(calc(9 * var(--u)),26vw)}
+ .wiw-avatar{font-size:min(calc(3.5 * var(--u)),10vw)}
+ .wiw-tile{width:min(calc(7 * var(--u)),20vw)}
+ .wiw-compare{gap:min(calc(3 * var(--u)),6vw)}
+ .wiw-compare figure{width:min(calc(10 * var(--u)),28vw)}}
 @supports not (aspect-ratio:1/1){
- .wiw-profile{width:7.5rem}.wiw-profile .wiw-avatar{height:7.5rem}.wiw-for .wiw-profile{width:5rem}.wiw-for .wiw-avatar{height:5rem}
- .wiw-compare figure{width:8rem}.wiw-compare .wiw-avatar{height:8rem}.wiw-tile{width:6rem;height:6rem}}
+ .wiw-profile{width:calc(9 * var(--u))}.wiw-profile .wiw-avatar{height:calc(9 * var(--u))}
+ .wiw-for .wiw-profile{width:calc(5 * var(--u))}.wiw-for .wiw-avatar{height:calc(5 * var(--u))}
+ .wiw-compare figure{width:calc(10 * var(--u))}.wiw-compare .wiw-avatar{height:calc(10 * var(--u))}
+ .wiw-tile{width:calc(7 * var(--u));height:calc(7 * var(--u))}}
 .wiw-nogap .wiw-panel>*+*{margin-top:2em}
-.wiw-nogap .wiw-grid>li,.wiw-nogap .wiw-gallery>li{margin:.6rem}
+.wiw-nogap .wiw-grid>li,.wiw-nogap .wiw-gallery>li{margin:.6em}
 .wiw-nogap .wiw-profile>*+*,.wiw-nogap .wiw-compare figure>*+*{margin-top:.7em}
 .wiw-nogap .wiw-field>*+*{margin-top:.4em}
 .wiw-nogap .wiw-actions>*,.wiw-nogap .wiw-compare>*{margin:0 .5em}
@@ -172,18 +191,42 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
     let busy = false;
     let bypass = false;
 
+    let preload; // { api, at, data }: profiles requested when the avatar was pressed, for the click that follows
+
     window.addEventListener('click', onAvatarClick, true);
+    // Pressing the avatar starts loading, so the picker can open as the click lands (a press lasts
+    // ~100 ms; on a phone over a slow link the request is the wait).
+    window.addEventListener('pointerdown', e => {
+        const api = window.ApiClient;
+        if (avatarTarget(e) && usable(api)) {
+            preload = { api, at: Date.now(), data: load(api) };
+            preload.data.catch(() => {});
+        }
+    }, true);
+
+    function avatarTarget(e) {
+        return !bypass && e.target instanceof Element && e.target.closest(AVATAR_SELECTOR);
+    }
+
+    function usable(api) {
+        return Boolean(api) && API_METHODS.every(m => typeof api[m] === 'function') && Boolean(api.getCurrentUserId());
+    }
+
+    // The profiles and the brand settings, in parallel.
+    function load(api) {
+        return Promise.all([loadUsers(api), api.getJSON(api.getUrl('WhoIsWatching/Settings')).catch(() => null)]);
+    }
 
     async function onAvatarClick(e) {
         // Any click may be the one that signs out (menus, settings page), so watch before it runs.
         watchSignOut(window.ApiClient);
-        const button = !bypass && e.target instanceof Element && e.target.closest(AVATAR_SELECTOR);
+        const button = avatarTarget(e);
         const api = window.ApiClient;
         if (!button) {
             return;
         }
 
-        if (!api || !API_METHODS.every(m => typeof api[m] === 'function') || !api.getCurrentUserId()) {
+        if (!usable(api)) {
             console.info('[WhoIsWatching] not signed in, or this Jellyfin Web lacks ApiClient methods; avatar left alone');
             return;
         }
@@ -196,13 +239,13 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
 
         trigger = button;
         opening = true;
+        // A press's preload is used only by its own click, never by a later one with older data.
+        const pressed = preload && preload.api === api && Date.now() - preload.at < 2000 ? preload.data : null;
+        preload = null;
         let users = [];
         let settings = null;
         try {
-            [users, settings] = await Promise.all([
-                loadUsers(api),
-                api.getJSON(api.getUrl('WhoIsWatching/Settings')).catch(() => null)
-            ]);
+            [users, settings] = await (pressed || load(api));
         } catch (err) {
             console.warn('[WhoIsWatching] could not load profiles', err);
         } finally {
@@ -307,7 +350,7 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
             brand.textContent = settings.Text;
             brand.style.color = settings.Color;
             brand.dataset.position = settings.Position;
-            dialog.style.setProperty('--wiw-brand-size', settings.Size + 'px');
+            dialog.style.setProperty('--wiw-brand-size', String(settings.Size));
         }
     }
 

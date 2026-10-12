@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.3.0.0",
+        "changelog": "The picker scales with the screen: the same proportions from phones and 1080p up to 1440p and 4K, limited by height on wide or short windows (the brand-text size is now pixels at 1080p and scales too). Older engines keep the fixed 1080p sizes. Pressing the avatar starts loading the profiles, so the picker opens as the click lands.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/freevibeprojects/Jellyfin-WhoIsWatching/main/releases/who-is-watching_1.3.0.0.zip",
+        "checksum": "4a1348c6f6a7a551e034605a79dbd9ab",
+        "timestamp": "2026-10-12T13:17:36Z"
+      },
+      {
         "version": "1.2.1.0",
         "changelog": "Works on older browsers and apps: Jellyfin Media Player's Chromium, Safari before 15.4, older WebViews and webOS (fallbacks for dialog, replaceChildren, createImageBitmap, :focus-visible, flexbox gap, aspect-ratio, clamp/max/env). Console notes explain when the avatar is left alone.",
         "targetAbi": "12.0.0.0",
