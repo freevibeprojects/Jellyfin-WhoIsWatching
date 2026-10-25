@@ -1168,6 +1168,11 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             context.fillStyle = '#303030'; // behind transparent images
             context.fillRect(0, 0, canvas.width, canvas.height);
             context.drawImage(image, (image.width - side) / 2, (image.height - side) / 2, side, side, 0, 0, canvas.width, canvas.height);
+            // A phone photo decodes to tens of MB: free it now, not at garbage collection after the upload.
+            if (image.close) {
+                image.close();
+            }
+
             const response = await fetch(api.getUrl('WhoIsWatching/Images'), {
                 method: 'POST',
                 headers: { Authorization: `MediaBrowser Token="${api.accessToken()}"`, 'Content-Type': 'image/jpeg' },
