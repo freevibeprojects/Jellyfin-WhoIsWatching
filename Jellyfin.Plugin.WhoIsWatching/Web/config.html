@@ -29,7 +29,7 @@
                             <option value="TopRight">Top right</option>
                         </select>
                     </div>
-                    <div style="margin:1em 0 2em;padding:1em 1.5em;border-radius:.3em;background:#101010">
+                    <div style="margin:1em 0 2em;padding:1em 1.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:var(--jf-palette-background-default,#101010)">
                         <span id="wiwBrandPreview" style="font-weight:700;line-height:1"></span>
                     </div>
                     <button is="emby-button" type="submit" class="raised button-submit block"><span>Save</span></button>
@@ -66,13 +66,18 @@
                             img.alt = '';
                             img.loading = 'lazy';
                             img.src = ApiClient.getUrl('WhoIsWatching/Images/' + id);
-                            img.style.cssText = 'width:7em;height:7em;object-fit:cover;border-radius:12%';
+                            img.className = 'cardImageContainer'; // only as round as the theme makes Jellyfin's cards
+                            img.style.cssText = 'width:7em;height:7em;object-fit:cover';
                             var remove = document.createElement('button');
                             remove.setAttribute('is', 'emby-button');
                             remove.type = 'button';
                             remove.className = 'raised wiwDelete';
                             remove.textContent = 'Delete';
                             remove.addEventListener('click', function () {
+                                if (!window.confirm('Delete this picture from the gallery? Profiles using it keep it.')) {
+                                    return;
+                                }
+
                                 ApiClient.ajax({ type: 'DELETE', url: ApiClient.getUrl('WhoIsWatching/Images/' + id) }).then(loadGallery);
                             });
                             item.append(img, remove);

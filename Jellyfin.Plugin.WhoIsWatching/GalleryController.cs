@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using MediaBrowser.Common.Api;
 using MediaBrowser.Common.Configuration;
@@ -17,9 +18,10 @@ namespace Jellyfin.Plugin.WhoIsWatching;
 
 /// <summary>
 /// The picker's brand settings and the shared profile-picture gallery. Pictures are JPEG files named
-/// by a server-made GUID in plugins/configurations/WhoIsWatching/images, so no client-supplied name
-/// ever reaches the file system. Choosing a picture copies it to the user through Jellyfin's own
-/// user-image API, which applies Jellyfin's permission checks; deleting one here leaves those copies.
+/// by a server-made GUID in plugins/configurations/WhoIsWatching/images/&lt;uploader's user ID&gt;, so no
+/// client-supplied name ever reaches the file system, and each uploader's share can be capped.
+/// Choosing a picture copies it to the user through Jellyfin's own user-image API, which applies
+/// Jellyfin's permission checks; deleting one here leaves those copies.
 /// Only JPEG is accepted (the picker always sends JPEG): every profile's browser decodes these files,
 /// and fewer decoders mean less attack surface (WebP's had remote code execution, CVE-2023-4863).
 /// </summary>
@@ -30,6 +32,10 @@ public sealed partial class GalleryController : ControllerBase
     // The client sends a 512 px JPEG (typically under 150 KB); the caps bound what one user can store.
     private const int MaxImageBytes = 1024 * 1024;
     private const int MaxImages = 200;
+    private const int MaxImagesPerUser = 20; // administrators: only the gallery's cap
+
+    // Counting and adding happen under one lock, so parallel uploads can't overshoot the caps.
+    private static readonly SemaphoreSlim AddLock = new(1, 1);
 
     private readonly IUserManager _userManager;
     private readonly string _folder;
@@ -46,15 +52,16 @@ public sealed partial class GalleryController : ControllerBase
     }
 
     /// <summary>
-    /// Gets the brand text settings, validated.
+    /// Gets the brand text settings, validated. Anonymous: the picker also covers the sign-in page,
+    /// and the brand text is shown there to anyone anyway.
     /// </summary>
     /// <returns>The settings.</returns>
     [HttpGet("Settings")]
-    [Authorize]
+    [AllowAnonymous]
     public BrandSettings GetSettings()
     {
         var config = Plugin.Instance?.Configuration ?? new PluginConfiguration();
-        var text = (config.BrandText ?? string.Empty).Trim();
+        var text = (config.BrandText ?? string.Empty).ReplaceLineEndings(" ").Trim(); // one line in the corner
         return new BrandSettings(
             text.Length > 40 ? text[..40] : text,
             config.BrandColor is { } color && ColorPattern().IsMatch(color) ? color : "#AA5CC3",
@@ -81,8 +88,8 @@ public sealed partial class GalleryController : ControllerBase
     [AllowAnonymous]
     public ActionResult GetImage(Guid id)
     {
-        var path = PathOf(id);
-        if (!System.IO.File.Exists(path))
+        var path = Find(id);
+        if (path is null)
         {
             return NotFound();
         }
@@ -128,22 +135,44 @@ public sealed partial class GalleryController : ControllerBase
             return StatusCode(StatusCodes.Status413PayloadTooLarge);
         }
 
-        if (!data.AsSpan(0, length).StartsWith((ReadOnlySpan<byte>)[0xFF, 0xD8, 0xFF]))
+        // Start and end markers and a plausible size: a whole JPEG, as the picker's canvas makes, not a stub.
+        var body = data.AsSpan(0, length);
+        if (length < 100 || !body.StartsWith((ReadOnlySpan<byte>)[0xFF, 0xD8, 0xFF]) || !body.EndsWith((ReadOnlySpan<byte>)[0xFF, 0xD9]))
         {
             return BadRequest("Not a JPEG image.");
         }
 
-        Directory.CreateDirectory(_folder);
+        await AddLock.WaitAsync(HttpContext.RequestAborted).ConfigureAwait(false);
+        try
+        {
+            return await Add(data.AsMemory(0, length)).ConfigureAwait(false);
+        }
+        finally
+        {
+            AddLock.Release();
+        }
+    }
+
+    private async Task<ActionResult> Add(ReadOnlyMemory<byte> picture)
+    {
         if (Pictures().Count() >= MaxImages)
         {
             return Conflict("The gallery is full. Remove pictures in the plugin's settings.");
         }
 
+        // One person can't fill the gallery for everyone. MayManageOwnPreferences found the user ID.
+        var folder = Path.Combine(_folder, CallerId()!.Value.ToString("N"));
+        if (!User.IsInRole("Administrator") && Directory.Exists(folder) && Directory.EnumerateFiles(folder, "*.jpg").Count() >= MaxImagesPerUser)
+        {
+            return Conflict($"You have added {MaxImagesPerUser} pictures, the most one person may add.");
+        }
+
+        Directory.CreateDirectory(folder);
         var id = Guid.NewGuid();
-        var path = PathOf(id);
+        var path = Path.Combine(folder, id.ToString("N") + ".jpg");
         try
         {
-            await System.IO.File.WriteAllBytesAsync(path + ".tmp", data.AsMemory(0, length), HttpContext.RequestAborted).ConfigureAwait(false);
+            await System.IO.File.WriteAllBytesAsync(path + ".tmp", picture, HttpContext.RequestAborted).ConfigureAwait(false);
             System.IO.File.Move(path + ".tmp", path);
         }
         finally
@@ -164,8 +193,8 @@ public sealed partial class GalleryController : ControllerBase
     [Authorize(Policy = Policies.RequiresElevation)]
     public ActionResult DeleteImage(Guid id)
     {
-        var path = PathOf(id);
-        if (!System.IO.File.Exists(path))
+        var path = Find(id);
+        if (path is null)
         {
             return NotFound();
         }
@@ -174,20 +203,25 @@ public sealed partial class GalleryController : ControllerBase
         return NoContent();
     }
 
-    // The ID is a parsed GUID, so the path can't leave the folder.
-    private string PathOf(Guid id) => Path.Combine(_folder, id.ToString("N") + ".jpg");
+    // The ID is a parsed GUID, so the name can't leave the folder. Pictures from before 1.4 sit at the top.
+    private string? Find(Guid id)
+        => Directory.Exists(_folder)
+            ? Directory.EnumerateFiles(_folder, id.ToString("N") + ".jpg", SearchOption.AllDirectories).FirstOrDefault()
+            : null;
 
     private IEnumerable<string> Pictures()
         => Directory.Exists(_folder)
-            ? Directory.EnumerateFiles(_folder, "*.jpg").Where(path => Guid.TryParseExact(Path.GetFileNameWithoutExtension(path), "N", out _))
+            ? Directory.EnumerateFiles(_folder, "*.jpg", SearchOption.AllDirectories).Where(path => Guid.TryParseExact(Path.GetFileNameWithoutExtension(path), "N", out _))
             : [];
+
+    private Guid? CallerId()
+        => Guid.TryParse(User.FindFirst("Jellyfin-UserId")?.Value, out var userId) ? userId : null;
 
     // The same rule Jellyfin applies to changing your own profile picture. The role and claim names
     // are Jellyfin.Api's UserRoles.Administrator and InternalClaimTypes.UserId.
     private bool MayManageOwnPreferences()
-        => User.IsInRole("Administrator")
-            || (Guid.TryParse(User.FindFirst("Jellyfin-UserId")?.Value, out var userId)
-                && _userManager.GetUserById(userId) is { EnableUserPreferenceAccess: true });
+        => CallerId() is { } userId
+            && (User.IsInRole("Administrator") || _userManager.GetUserById(userId) is { EnableUserPreferenceAccess: true });
 
     [GeneratedRegex("^#[0-9A-Fa-f]{6}$")]
     private static partial Regex ColorPattern();

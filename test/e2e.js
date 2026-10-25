@@ -26,9 +26,32 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   // OLD_ENGINE=1: run everything without <dialog>, replaceChildren and createImageBitmap, like older
   // Safari, WebViews and Jellyfin Media Player's Chromium, so the fallbacks are exercised.
   if (process.env.OLD_ENGINE) await page.addInitScript(() => { delete window.HTMLDialogElement; delete Element.prototype.replaceChildren; delete window.createImageBitmap; });
+  // first visit, signed out: the picker covers Jellyfin's sign-in page, which stays reachable
   await page.goto(B + '/web/');
-  await page.waitForFunction(() => window.ApiClient);
-  await page.evaluate(() => window.ApiClient.authenticateUserByName('Alice', 'alicepw'));
+  await page.waitForSelector('.wiw[open] .wiw-grid button', { timeout: 30000 });
+  const signedOut = await page.evaluate(() => ({
+    names: Array.from(document.querySelectorAll('.wiw-grid .wiw-name'), e => e.textContent).join(),
+    noSettings: document.querySelector('[data-action=manage]').hidden && document.querySelector('[data-action=account]').hidden,
+    other: !document.querySelector('.wiw-other').hidden,
+    brand: document.querySelector('.wiw-brand').textContent,
+    page: location.hash
+  }));
+  ok(signedOut.names === 'Alice,Bob,Kid' && signedOut.noSettings && signedOut.other && signedOut.brand && signedOut.page.includes('login'), 'signed out, the picker covers the sign-in page: ' + JSON.stringify(signedOut));
+  await page.waitForTimeout(400); await page.screenshot({ path: out + '/' + (layout || 'default') + '-0-signin.png' });
+  await page.click('.wiw-other');
+  ok(!(await page.$('.wiw[open]')) && await page.isVisible('#loginPage .btnManual') && await page.waitForFunction(() => document.getElementById('loginPage').contains(document.activeElement), null, { timeout: 3000 }).then(() => true, () => false), 'Other ways to sign in shows Jellyfin’s sign-in page, focus on it');
+  await page.reload();
+  // a phone held sideways: the password step still shows Sign in without scrolling
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.click('.wiw[open] .wiw-grid button[aria-label="Bob"]', { timeout: 30000 });
+  ok(await page.$eval('.wiw-auth button[type=submit]', b => b.getBoundingClientRect().bottom <= innerHeight), 'phone landscape: Sign in fits on screen');
+  await page.keyboard.press('Escape');
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.click('.wiw[open] .wiw-grid button[aria-label="Alice"]', { timeout: 30000 });
+  await page.fill('.wiw-input', 'alicepw');
+  await Promise.all([page.waitForEvent('load'), page.keyboard.press('Enter')]);
+  await page.waitForFunction(() => window.ApiClient && window.ApiClient.getCurrentUserId(), null, { timeout: 30000 });
+  ok(!(await page.$('.wiw[open]')), 'signed in from the picker on the sign-in page');
   await page.goto(B + '/web/#/home');
   const avatar = page.locator('.headerUserButton, [aria-controls="app-user-menu"]').locator('visible=true').first();
   await avatar.waitFor({ timeout: 30000 });
@@ -83,11 +106,21 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   ok(await page.textContent('.wiw-pick .wiw-title') === 'Manage profiles' && (await page.$$('.wiw-grid .wiw-pencil')).length === 3, 'Manage profiles marks every profile for an administrator');
   const bobBefore = await page.$eval('.wiw-grid button[aria-label^="Bob"] img', i => i.src);
   await page.click('.wiw-grid button[aria-label^="Bob"]');
-  await page.waitForSelector('.wiw-pictures:not([hidden]) .wiw-add');
+  await page.waitForSelector('.wiw-pictures:not([hidden]) .wiw-gallery li');
   await page.waitForTimeout(300); await page.screenshot({ path: out + '/' + (layout || 'default') + '-4-pictures.png' });
-  const photo = await page.screenshot({ clip: { x: 0, y: 0, width: 900, height: 500 } });
-  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('.wiw-add')]);
-  await chooser.setFiles({ name: 'photo.png', mimeType: 'image/png', buffer: photo });
+  if (layout === 'tv') {
+    // a TV remote can't use a file picker: no + tile, a hint, and pictures added elsewhere are offered
+    ok(!(await page.$('.wiw-add')) && (await page.textContent('.wiw-gallery')).includes('phone or computer'), 'TV: no file picker, a hint instead');
+    const jpeg = await page.screenshot({ type: 'jpeg', clip: { x: 0, y: 0, width: 400, height: 400 } });
+    await fetch(B + '/WhoIsWatching/Images', { method: 'POST', headers: { ...auth(adminToken), 'Content-Type': 'image/jpeg' }, body: jpeg });
+    await page.keyboard.press('Escape');
+    await page.click('.wiw-grid button[aria-label^="Bob"]');
+    await page.click('.wiw-gallery .wiw-tile[data-id]');
+  } else {
+    const photo = await page.screenshot({ clip: { x: 0, y: 0, width: 900, height: 500 } });
+    const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('.wiw-add')]);
+    await chooser.setFiles({ name: 'photo.png', mimeType: 'image/png', buffer: photo });
+  }
   await page.waitForSelector('.wiw-confirm:not([hidden])', { timeout: 15000 });
   await page.waitForTimeout(300); await page.screenshot({ path: out + '/' + (layout || 'default') + '-5-confirm.png' });
   await page.click('[data-action=apply]');
@@ -128,6 +161,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.click('#wiwConfigForm button[type=submit]');
   const saved = await page.waitForFunction(() => window.ApiClient.getJSON(window.ApiClient.getUrl('WhoIsWatching/Settings')).then(s => s.Text === 'Saved here'), null, { timeout: 10000 }).then(() => true, () => false);
   const listed = (await page.$$('#wiwGallery .wiwDelete')).length;
+  page.once('dialog', d => d.accept()); // "Delete this picture?"
   await page.click('#wiwGallery .wiwDelete');
   const deleted = await page.waitForFunction(n => document.querySelectorAll('#wiwGallery .wiwDelete').length === n - 1, listed, { timeout: 10000 }).then(() => true, () => false);
   ok(saved && deleted, `dashboard page saves the brand text (${saved}) and deletes pictures (${deleted})`);
@@ -135,15 +169,45 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.goto(B + '/web/#/home');
   await avatar.waitFor({ timeout: 30000 });
 
-  // the picker follows the theme, custom CSS included: the gear grows and takes its accent on hover
-  const theme = await page.addStyleTag({ content: '.button-submit{background:rgb(255, 0, 128)!important}' });
-  await avatar.click();
-  await page.hover('[data-action=account]');
-  await page.waitForTimeout(400);
-  ok(await page.$eval('[data-action=account]', b => getComputedStyle(b).color === 'rgb(255, 0, 128)' && getComputedStyle(b).transform.startsWith('matrix(1.25')), 'gear hover follows a custom theme accent');
-  await theme.evaluate(el => el.remove());
+  // the theme styles the picker through Jellyfin's own classes, custom CSS included: pictures are
+  // only as round as the theme makes Jellyfin's cards, buttons and fields look like Jellyfin's
+  // (Dashboard -> General -> Custom CSS, which Jellyfin Web loads after the theme). Jellyfin Web
+  // fetches it once per browser session, so each check uses a fresh browser on the sign-in page.
+  const customCss = async css => {
+    await fetch(B + '/System/Configuration/branding', { method: 'POST', headers: { ...auth(adminToken), 'Content-Type': 'application/json' }, body: JSON.stringify({ CustomCss: css, LoginDisclaimer: css ? 'House rules: no spoilers.' : '', SplashscreenEnabled: false }) });
+    const fresh = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+    if (layout) await fresh.addInitScript(l => localStorage.setItem('layout', l), layout);
+    await fresh.goto(B + '/web/');
+    await fresh.waitForFunction(c => document.querySelector('.wiw[open] .wiw-grid .wiw-avatar') && (!c || Array.from(document.querySelectorAll('style'), s => s.textContent).includes(c)), css, { timeout: 30000 });
+    return fresh;
+  };
+  const radius = p => p.$eval('.wiw-grid .wiw-avatar', a => getComputedStyle(a).borderTopLeftRadius);
+  // a server slow to list profiles: Jellyfin's sign-in page isn't kept hidden for long
+  const stalled = await (await browser.newContext()).newPage();
+  await stalled.route(/Users\/Public/i, () => {}); // never answers
+  await stalled.goto(B + '/web/');
+  await stalled.waitForSelector('#loginPage', { timeout: 30000 });
+  await stalled.waitForTimeout(3500);
+  ok(await stalled.$eval('#loginPage', p => getComputedStyle(p).visibility === 'visible'), 'a stalled profile list leaves Jellyfin’s sign-in page visible after 3 s');
+  await stalled.context().close();
+  let themedPage = await customCss('');
+  const themed = await radius(themedPage);
+  await themedPage.context().close();
+  themedPage = await customCss(':root{--jf-card-borderRadius:0px}');
+  const square = await radius(themedPage);
+  await themedPage.context().close();
+  themedPage = await customCss('.cardImageContainer{border-radius:9px}.button-submit{background:rgb(255, 0, 128)}.emby-input{border-radius:5px}body,.backgroundContainer{background-image:linear-gradient(rgb(1, 2, 3),rgb(4, 5, 6))}');
+  const custom = await radius(themedPage);
+  // the page's own background (Custom CSS or a theme image) and Jellyfin's Login Disclaimer carry over
+  ok(await themedPage.$eval('.wiw', d => getComputedStyle(d).backgroundImage.includes('rgb(1, 2, 3)')) && await themedPage.textContent('.wiw-disclaimer') === 'House rules: no spoilers.', 'the sign-in picker shows the page background and the Login Disclaimer');
+  ok(themed !== '0px' && square === '0px' && custom === '9px', `pictures follow the theme's card rounding: theme ${themed}, unrounded theme ${square}, custom CSS ${custom}`);
+  await themedPage.click('.wiw-grid button[aria-label="Bob"]');
+  ok(await themedPage.$eval('.wiw-auth button[type=submit]', b => getComputedStyle(b).backgroundColor) === 'rgb(255, 0, 128)' && await themedPage.$eval('.wiw-input', i => getComputedStyle(i).borderTopLeftRadius) === '5px', 'custom CSS restyles the Sign in button and the password field');
+  await themedPage.context().close();
+  await fetch(B + '/System/Configuration/branding', { method: 'POST', headers: { ...auth(adminToken), 'Content-Type': 'application/json' }, body: JSON.stringify({ CustomCss: '', SplashscreenEnabled: false }) });
 
   // wrong password keeps current session
+  await avatar.click();
   await page.click('.wiw-grid button[aria-label="Bob"]');
   await page.waitForSelector('.wiw-auth:not([hidden]) .wiw-input:focus');
   ok(await page.isVisible('.wiw-remember'), 'Remember on this device offered for Bob');
@@ -182,10 +246,12 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   }
   ok(await page.evaluate(() => document.querySelector('.wiw').hasAttribute('open') && !document.querySelector('.wiw-pick').hidden), 'Escape keeps returning to the grid, not closing the picker');
 
-  // correct password switches and revokes old token
+  // correct password switches and revokes old token, even where Jellyfin's "Remember me" was unticked
+  await page.evaluate(() => localStorage.setItem('enableAutoLogin', 'false'));
   await page.click('.wiw-grid button[aria-label="Bob"]');
   await page.fill('.wiw-input', 'bobpw');
-  await page.check('.wiw-remember');
+  await page.click('.wiw-check label'); // Jellyfin's checkbox: the label is what gets clicked
+  ok(await page.isChecked('.wiw-remember'), 'clicking Remember on this device ticks it');
   await page.focus('.wiw-input');
   await Promise.all([page.waitForEvent('load'), page.keyboard.press('Enter')]);
   await avatar.waitFor({ timeout: 30000 });
@@ -246,14 +312,15 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   const marks = await page.$$eval('.wiw-grid .wiw-profile', els => els.map(e => e.getAttribute('aria-label') + (e.getAttribute('aria-disabled') ? ' (no)' : '')));
   ok((await page.$$('.wiw-grid .wiw-pencil')).length === 1 && marks.includes('Bob, current profile, change picture'), 'Bob manages only his own profile: ' + marks.join('; '));
   await page.click('.wiw-grid button[aria-label^="Bob"]');
-  ok(await page.waitForSelector('.wiw-pictures:not([hidden]) .wiw-add', { timeout: 5000 }).then(() => true, () => false), 'Bob may add pictures');
+  ok(await page.waitForSelector(layout === 'tv' ? '.wiw-pictures:not([hidden]) .wiw-gallery li' : '.wiw-pictures:not([hidden]) .wiw-add', { timeout: 5000 }).then(() => true, () => false), 'Bob may add pictures (TV: the gallery opens)');
   for (let i = 0; i < 3; i++) await page.keyboard.press('Escape');
   ok(!(await page.$('.wiw[open]')), 'Escape steps back out of the pictures, Manage profiles, then the picker');
 
   // gallery API: sign-in to list, images only, 1 MB cap, admins delete, adding needs "manage own preferences"
   const bobApi = await signIn('Bob', 'bobpw', 'e2e-bob');
   const post = (token, body) => fetch(B + '/WhoIsWatching/Images', { method: 'POST', headers: { ...auth(token), 'Content-Type': 'image/jpeg' }, body });
-  const added = await post(bobApi, Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(100)]));
+  const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(100), Buffer.from([0xff, 0xd9])]);
+  const added = await post(bobApi, jpeg);
   const addedId = added.ok ? (await added.json()).Id : '';
   const served = await fetch(B + '/WhoIsWatching/Images/' + addedId);
   const kidPolicy = (await (await fetch(B + '/Users', { headers: auth(adminToken) })).json()).find(u => u.Name === 'Kid');
@@ -262,6 +329,8 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   const rules = {
     anonymousList: (await fetch(B + '/WhoIsWatching/Images')).status === 401,
     notAnImage: (await post(bobApi, Buffer.from('<svg onload=alert(1)>'))).status === 400,
+    stub: (await post(bobApi, Buffer.from([0xff, 0xd8, 0xff, 0xd9]))).status === 400,
+    notWholeJpeg:(await post(bobApi, Buffer.from('ÿØÿà<html>', 'latin1'))).status === 400,
     pngRefused: (await post(bobApi, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0]))).status === 400,
     tooBig: (await post(bobApi, Buffer.alloc(1024 * 1024 + 1, 0xff))).status === 413,
     added: added.status === 200,
@@ -271,6 +340,17 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
     adminDeletes: (await fetch(B + '/WhoIsWatching/Images/' + addedId, { method: 'DELETE', headers: auth(adminToken) })).status === 204,
     noTraversal: (await fetch(B + '/WhoIsWatching/Images/..%2F..%2Fsystem.xml')).status === 404
   };
+  // one person can't fill the gallery: 20 pictures each (administrators aren't capped)
+  const bobsIds = [];
+  let capped = 0;
+  for (let i = 0; i < 21; i++) {
+    const r = await post(bobApi, jpeg);
+    if (r.ok) bobsIds.push((await r.json()).Id); else capped = r.status;
+  }
+  const adminAdds = await post(adminToken, jpeg);
+  if (adminAdds.ok) bobsIds.push((await adminAdds.json()).Id);
+  rules.perUserCap = capped === 409 && bobsIds.length <= 21 && adminAdds.ok;
+  for (const id of bobsIds) await fetch(B + '/WhoIsWatching/Images/' + id, { method: 'DELETE', headers: auth(adminToken) });
   await fetch(B + `/Users/${kidPolicy.Id}/Policy`, { method: 'POST', headers: { ...auth(adminToken), 'Content-Type': 'application/json' }, body: JSON.stringify(kidPolicy.Policy) });
   ok(Object.values(rules).every(Boolean), 'gallery API rules: ' + JSON.stringify(rules));
 

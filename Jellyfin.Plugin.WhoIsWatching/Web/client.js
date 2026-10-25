@@ -15,6 +15,10 @@
 // passwordless and switches to it in one click. That hint is a user ID, never a secret.
 // A profile can also be remembered on this device: its Jellyfin access token is kept (never the
 // password), like Jellyfin's own "Remember me", so it opens in one click. Administrators never are.
+// Signed out, the picker covers Jellyfin's sign-in page, which stays underneath for manual sign-in,
+// Quick Connect and "Forgot password".
+// Controls carry Jellyfin's own classes (emby-button, emby-input, emby-checkbox, cardImageContainer,
+// defaultCardBackgroundN), so the active theme and custom CSS style them as on Jellyfin's pages.
 // When any of it is missing, the avatar button keeps its normal behaviour.
 (() => {
     'use strict';
@@ -33,7 +37,8 @@
         back: 'Back',
         passwordHint: 'Leave empty if this profile has no password.',
         remember: 'Remember on this device',
-        rememberHint: 'Anyone using this device can then open this profile without the password.',
+        rememberHint: 'Anyone using this device can then open this profile without the password, until someone signs out.',
+        otherSignIn: 'Other ways to sign in',
         manage: 'Manage profiles',
         done: 'Done',
         picture: 'change picture',
@@ -41,6 +46,7 @@
         addPicture: 'Add a picture',
         galleryPicture: 'Picture',
         noPictures: 'No pictures yet.',
+        addElsewhere: 'Pictures are added from a phone or computer.',
         confirmPicture: 'Change profile picture?',
         currentPicture: 'Current',
         newPicture: 'New',
@@ -49,12 +55,13 @@
         current: 'current profile',
         failed: 'Couldn’t sign in. Check the password and try again.',
         offline: 'Couldn’t reach the server. Try again.',
-        pictureFailed: 'Couldn’t change the picture. Try another image.'
+        pictureFailed: 'Couldn’t change the picture. Try another image.',
+        galleryFull: 'You can’t add more pictures. Pick one from the gallery, or ask an administrator to remove some.'
     };
 
     const PASSWORDLESS_KEY = 'whoiswatching-passwordless-';
     const REMEMBERED_KEY = 'whoiswatching-remembered-';
-    const COLORS = ['#00838f', '#7b1fa2', '#c62828', '#2e7d32', '#ef6c00', '#3949ab', '#ad1457', '#5d4037'];
+    const CARD_COLORS = 5; // the theme's defaultCardBackground1..5, as on Jellyfin's sign-in page
     // Material icons (Apache 2.0): close, settings, edit, add, arrow.
     const ICON_CLOSE = 'M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z';
     const ICON_SETTINGS = 'M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z';
@@ -64,95 +71,102 @@
 
     // Everything scales with --u: 16px at 1080p, growing with the screen (21px at 1440p, 32px at 4K),
     // limited by height so wide or short windows still fit; phones are guarded with vw. Engines
-    // without clamp()/min() keep --u at 16px. --wiw-accent and --wiw-on-accent come from the theme
+    // without clamp()/min() keep --u at 16px. --wiw-accent comes from the theme
     // each time the picker opens; .wiw-nogap stands in for flexbox gap on older engines.
+    // Shapes and colours of buttons, fields, the checkbox and pictures are left to Jellyfin's classes
+    // and the theme (no rounding unless the theme rounds); this sheet only sizes and places them.
+    // Rules on Jellyfin-classed controls start with .wiw so Jellyfin's later-loaded chunk CSS
+    // (playback's .paper-icon-button-light) can't resize them.
     const CSS = `
 .wiw{--u:16px;position:fixed;top:0;right:0;bottom:0;left:0;z-index:2147483647;width:100%;height:100%;max-width:none;max-height:none;margin:0;border:0;
  padding:var(--u);
- box-sizing:border-box;overflow:auto;background:var(--jf-palette-background-default,#101010);
+ box-sizing:border-box;overflow:auto;background-color:var(--jf-palette-background-default,#101010);
+ background-image:var(--jf-palette-background-defaultImage,none);background-position:top;background-repeat:no-repeat;background-size:cover;
  color:var(--jf-palette-text-primary,#fff);font:inherit;font-size:var(--u);animation:wiw-in .18s ease-out}
 .wiw[open]{display:flex}
-.wiw:not([open]){display:none}
+.wiw:not([open]),.wiw [hidden]{display:none!important}
+.wiw:focus{outline:none}
 .wiw::backdrop{background:var(--jf-palette-background-default,#101010)}
 .wiw[aria-busy=true]{cursor:progress}
 .wiw-panel{margin:auto;display:flex;flex-direction:column;align-items:center;gap:2em;text-align:center;max-width:64em}
-.wiw-panel[hidden]{display:none}
 .wiw-title{margin:0;font-size:3em;font-weight:500}
 .wiw-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:calc(2 * var(--u));margin:0;padding:0;list-style:none}
 .wiw-profile{display:flex;flex-direction:column;align-items:center;gap:.7em;width:calc(9 * var(--u));padding:0;border:0;
  background:none;color:var(--jf-palette-text-secondary,rgba(255,255,255,.7));font:inherit;cursor:pointer;outline:none}
-.wiw-avatar{position:relative;display:grid;place-items:center;width:100%;aspect-ratio:1;overflow:hidden;border-radius:12%;
- background:var(--wiw-color);color:#fff;font-size:calc(3.5 * var(--u));font-weight:500;
+.wiw-avatar{position:relative;display:grid;place-items:center;width:100%;aspect-ratio:1;overflow:hidden;
+ color:#fff;
  box-shadow:0 0 0 0 transparent;transition:box-shadow .15s,transform .15s}
+.wiw-initial{font-size:calc(3.5 * var(--u));font-weight:500;line-height:1}
 .wiw-avatar img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover}
-.wiw-profile[aria-current=true] .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u)) var(--wiw-accent,#00a4dc)}
+.wiw-profile[aria-current=true] .wiw-avatar{box-shadow:0 0 0 calc(.3 * var(--u)) var(--wiw-accent,#00a4dc)}
 button.wiw-profile:hover,button.wiw-profile:focus-visible{color:var(--jf-palette-text-primary,#fff)}
-button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u)) var(--jf-palette-text-primary,#fff);transform:scale(1.04)}
+button.wiw-profile:hover .wiw-avatar{transform:scale(1.04)}
+button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u)) var(--jf-palette-text-primary,#fff);transform:scale(1.04)}
 .wiw-busy .wiw-avatar{animation:wiw-pulse 1s ease-in-out infinite}
 .wiw-name{display:flex;align-items:center;gap:.3em;max-width:100%;font-size:1.05em;word-break:break-word;overflow-wrap:anywhere}
 .wiw svg{width:1em;height:1em;flex:none;fill:currentColor}
-.wiw-button{min-height:2.75em;padding:.5em 1.6em;border:1px solid var(--jf-palette-text-secondary,rgba(255,255,255,.7));border-radius:.3em;
- background:none;color:var(--jf-palette-text-secondary,rgba(255,255,255,.7));font:inherit;letter-spacing:.05em;cursor:pointer}
-.wiw-button:hover,.wiw-button:focus-visible{border-color:var(--jf-palette-text-primary,#fff);color:var(--jf-palette-text-primary,#fff)}
-.wiw-primary{border-color:transparent;background:var(--wiw-accent,#00a4dc);color:var(--wiw-on-accent,#fff)}
-.wiw-primary:hover,.wiw-primary:focus-visible{border-color:var(--jf-palette-text-primary,#fff);color:var(--wiw-on-accent,#fff)}
-.wiw-button:focus-visible,.wiw-close:focus-visible,.wiw-input:focus-visible,.wiw-remember:focus-visible{outline:2px solid var(--wiw-accent,#00a4dc);outline-offset:2px}
+.wiw .wiw-button{justify-content:center;min-width:8em;margin:0;padding:.75em 1.6em}
+/* Jellyfin's buttons drop the outline (outline:none!important), and a submit button's focus colour
+   can equal its normal one, so keyboard and remote focus also gets a ring. */
+.wiw .wiw-button:focus-visible,.wiw .paper-icon-button-light:focus-visible,.wiw .emby-checkbox:focus-visible+span+.checkboxOutline{box-shadow:0 0 0 calc(.15 * var(--u)) var(--jf-palette-text-primary,#fff)}
+.layout-tv .wiw .emby-checkbox:focus+span+.checkboxOutline{transform:scale(1.2)}
 .wiw button:disabled,.wiw input:disabled{cursor:progress}
-.wiw-close{position:absolute;top:calc(.75 * var(--u));right:calc(.75 * var(--u));
- display:grid;place-items:center;width:2.75em;height:2.75em;padding:0;border:0;border-radius:50%;background:none;color:inherit;font-size:1.2em;cursor:pointer}
-.wiw-close:hover{background:var(--jf-palette-action-hover,rgba(255,255,255,.08))}
-.wiw-icon{display:grid;place-items:center;width:2em;height:2em;padding:0;border:0;border-radius:50%;background:none;
- color:var(--jf-palette-text-secondary,rgba(255,255,255,.7));font-size:1.6em;cursor:pointer;outline:none;transition:transform .2s,color .2s}
-.wiw-icon:hover,.wiw-icon:focus-visible{color:var(--wiw-accent,#00a4dc);transform:scale(1.25)}
+.wiw .wiw-close{position:absolute;top:calc(.75 * var(--u));right:calc(.75 * var(--u));width:2.75em;height:2.75em;margin:0;padding:0;font-size:1.2em}
+.wiw .wiw-icon{width:2em;height:2em;margin:0;padding:0;font-size:1.6em}
 .wiw-brand{position:absolute;top:var(--u);left:calc(1.5 * var(--u));margin:0;
- font-size:calc(var(--wiw-brand-size,40) * var(--u) / 16);font-weight:700;line-height:1;white-space:nowrap}
+ font-size:calc(var(--wiw-brand-size,40) * var(--u) / 16);font-weight:700;line-height:1;white-space:nowrap;
+ max-width:calc(100% - 9 * var(--u));overflow:hidden;text-overflow:ellipsis}
 .wiw-brand[data-position=TopCenter]{left:50%;transform:translateX(-50%)}
 .wiw-brand[data-position=TopRight]{left:auto;right:calc(4.4 * var(--u))}
-.wiw-brand[hidden]{display:none}
 .wiw-branded{padding-top:calc(2 * var(--u) + var(--wiw-brand-size,40) * var(--u) / 16)}
-.wiw-pencil{position:absolute;top:0;left:0;width:100%;height:100%;display:grid;place-items:center;background:rgba(0,0,0,.55);color:#fff;font-size:.5em}
+.wiw-pencil{position:absolute;top:0;left:0;width:100%;height:100%;display:grid;place-items:center;background:rgba(0,0,0,.55);color:#fff;font-size:calc(1.75 * var(--u))}
 .wiw-pencil svg{padding:.35em;border:2px solid;border-radius:50%}
 .wiw-new .wiw-avatar{background:var(--jf-palette-background-paper,#202020)}
 .wiw-profile[aria-disabled=true]{opacity:.35;cursor:default}
 .wiw-for .wiw-profile{width:calc(5 * var(--u));font-size:.9em}
-.wiw-for .wiw-avatar{font-size:calc(2 * var(--u))}
+.wiw-for .wiw-initial{font-size:calc(2 * var(--u))}
 .wiw-gallery{display:flex;flex-wrap:wrap;justify-content:center;gap:calc(1.25 * var(--u));margin:0;padding:0;list-style:none}
-.wiw-tile{position:relative;display:grid;place-items:center;width:calc(7 * var(--u));aspect-ratio:1;padding:0;border:0;border-radius:12%;overflow:hidden;
- background:var(--jf-palette-background-paper,#202020);color:var(--jf-palette-text-secondary,rgba(255,255,255,.7));font-size:2.2em;cursor:pointer;outline:none;transition:box-shadow .15s,transform .15s}
+.wiw-tile{position:relative;display:grid;place-items:center;width:calc(7 * var(--u));aspect-ratio:1;padding:0;border:0;overflow:hidden;
+ background:var(--jf-palette-background-paper,#202020);color:var(--jf-palette-text-secondary,rgba(255,255,255,.7));cursor:pointer;outline:none;transition:box-shadow .15s,transform .15s}
+.wiw-tile svg{font-size:2.2em}
 .wiw-tile img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover}
-.wiw-tile:hover,.wiw-tile:focus-visible{box-shadow:0 0 0 calc(.19 * var(--u)) var(--wiw-accent,#00a4dc);transform:scale(1.06)}
+.wiw-tile:hover,.wiw-tile:focus-visible{box-shadow:0 0 0 calc(.19 * var(--u)) var(--jf-palette-text-primary,#fff);transform:scale(1.06)}
 .wiw-add{border:2px dashed currentColor}
 .wiw-add:hover,.wiw-add:focus-visible{color:var(--wiw-accent,#00a4dc)}
 .wiw-compare{display:flex;align-items:center;gap:calc(3 * var(--u))}
 .wiw-compare figure{display:flex;flex-direction:column;align-items:center;gap:.7em;width:calc(10 * var(--u));margin:0;color:var(--jf-palette-text-secondary,rgba(255,255,255,.7))}
 .wiw-compare>svg{font-size:2em}
 .wiw-auth .wiw-profile{cursor:default;color:var(--jf-palette-text-primary,#fff)}
-.wiw-field{display:flex;flex-direction:column;align-items:stretch;gap:.4em;width:20em;max-width:80vw;text-align:start;color:var(--jf-palette-text-secondary,rgba(255,255,255,.7))}
-.wiw-hint{font-size:.85em}
-.wiw-input{box-sizing:border-box;width:100%;min-height:2.75em;padding:.5em .8em;border:1px solid var(--jf-palette-divider,rgba(255,255,255,.12));border-radius:.3em;
- background:var(--jf-palette-FilledInput-bg,#292929);color:var(--jf-palette-text-primary,#fff);font:inherit}
-.wiw-check{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:.2em .6em;width:20em;max-width:80vw;margin-top:-1em;text-align:start;cursor:pointer}
-.wiw-check[hidden]{display:none}
-.wiw-check .wiw-hint{grid-column:2;color:var(--jf-palette-text-secondary,rgba(255,255,255,.7))}
-.wiw-remember{width:1.2em;height:1.2em;margin:0;accent-color:var(--wiw-accent,#00a4dc)}
-.wiw-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:1em}
-.wiw-error{min-height:1.5em;margin:-1em 0 0;color:var(--jf-palette-error-light,#ef5350)}
+.wiw-field{display:flex;flex-direction:column;align-items:stretch;gap:.4em;width:20em;max-width:80vw;text-align:start}
+.wiw-field .inputLabel{margin:0}
+.wiw-hint{margin:0;font-size:.85em}
+.wiw .wiw-check{flex-direction:column;width:20em;max-width:80vw;margin:-1em 0 0;text-align:start}
+.wiw-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:1.5em}
+.wiw-disclaimer{max-width:40em;margin:0;white-space:pre-line;overflow-wrap:anywhere}
+.wiw-error{max-width:20em;min-height:1.5em;margin:-1em 0 0;color:var(--jf-palette-error-light,#ef5350)}
 /* Modern engines: scale with the screen and keep clear of notches. A declaration using var() can't fall
    back to an earlier one, so max()/env() live only here. */
 @supports (width:clamp(1px,min(1vw,1vh),2px)){
  .wiw{--u:clamp(15px,min(.8333vw,1.4815vh),64px);
   padding:max(var(--u),env(safe-area-inset-top)) max(var(--u),env(safe-area-inset-right)) max(var(--u),env(safe-area-inset-bottom)) max(var(--u),env(safe-area-inset-left))}
  .wiw-branded{padding-top:calc(max(var(--u),env(safe-area-inset-top)) + var(--u) + var(--wiw-brand-size,40) * var(--u) / 16)}
- .wiw-close{top:max(calc(.75 * var(--u)),env(safe-area-inset-top));right:max(calc(.75 * var(--u)),env(safe-area-inset-right))}
+ .wiw .wiw-close{top:max(calc(.75 * var(--u)),env(safe-area-inset-top));right:max(calc(.75 * var(--u)),env(safe-area-inset-right))}
  .wiw-brand{top:max(var(--u),env(safe-area-inset-top));left:max(calc(1.5 * var(--u)),env(safe-area-inset-left))}
  .wiw-brand[data-position=TopRight]{right:calc(max(calc(.75 * var(--u)),env(safe-area-inset-right)) + 3.65 * var(--u))}
  .wiw-title{font-size:min(3em,8vw)}
+ .wiw-brand{font-size:min(calc(var(--wiw-brand-size,40) * var(--u) / 16),10vw)}
  .wiw-grid{gap:min(calc(2 * var(--u)),4vw)}
  .wiw-profile{width:min(calc(9 * var(--u)),26vw)}
- .wiw-avatar{font-size:min(calc(3.5 * var(--u)),10vw)}
+ .wiw-initial{font-size:min(calc(3.5 * var(--u)),10vw)}
  .wiw-tile{width:min(calc(7 * var(--u)),20vw)}
  .wiw-compare{gap:min(calc(3 * var(--u)),6vw)}
  .wiw-compare figure{width:min(calc(10 * var(--u)),28vw)}}
+/* Short screens (phones held sideways): tighter, no brand text, no avatar on the password step. */
+@media (max-height:500px){
+ .wiw-panel{gap:.8em}
+ .wiw .wiw-check,.wiw-error{margin-top:-.4em}
+ .wiw-branded{padding-top:var(--u)}
+ .wiw-brand,.wiw-auth .wiw-avatar{display:none}}
 @supports not (aspect-ratio:1/1){
  .wiw-profile{width:calc(9 * var(--u))}.wiw-profile .wiw-avatar{height:calc(9 * var(--u))}
  .wiw-for .wiw-profile{width:calc(5 * var(--u))}.wiw-for .wiw-avatar{height:calc(5 * var(--u))}
@@ -165,7 +179,7 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
 .wiw-nogap .wiw-actions>*,.wiw-nogap .wiw-compare>*{margin:0 .5em}
 @keyframes wiw-in{from{opacity:0;transform:scale(1.03)}}
 @keyframes wiw-pulse{50%{opacity:.5}}
-@media (prefers-reduced-motion:reduce){.wiw,.wiw-avatar,.wiw-busy .wiw-avatar,.wiw-icon,.wiw-tile{animation:none;transition:none}}
+@media (prefers-reduced-motion:reduce){.wiw,.wiw-avatar,.wiw-busy .wiw-avatar,.wiw-tile{animation:none;transition:none}}
 `;
 
     // Shown in the console so a device where the picker doesn't appear can be checked (F12, or
@@ -204,12 +218,92 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
         }
     }, true);
 
+    // Jellyfin's sign-in page (every page Jellyfin shows fires viewbeforeshow and viewshow; they don't
+    // always bubble, so they are caught on the way down), including one shown before this script ran.
+    // Any other page showing (the browser's Back button) closes the picker.
+    const onView = e => {
+        if (e.target.id === 'loginPage') {
+            openSignIn(e.target);
+        } else if (e.type === 'viewshow' && isOpen() && !busy) {
+            closeDialog();
+        }
+    };
+    document.addEventListener('viewbeforeshow', onView, true);
+    document.addEventListener('viewshow', onView, true);
+    if (onLoginPage()) {
+        openSignIn(document.getElementById('loginPage'));
+    }
+
     function avatarTarget(e) {
         return !bypass && e.target instanceof Element && e.target.closest(AVATAR_SELECTOR);
     }
 
+    function hasApi(api) {
+        return Boolean(api) && API_METHODS.every(m => typeof api[m] === 'function');
+    }
+
     function usable(api) {
-        return Boolean(api) && API_METHODS.every(m => typeof api[m] === 'function') && Boolean(api.getCurrentUserId());
+        return hasApi(api) && Boolean(api.getCurrentUserId());
+    }
+
+    // Jellyfin's TV layout: a remote, no file picker.
+    function isTv() {
+        return document.documentElement.classList.contains('layout-tv');
+    }
+
+    function onLoginPage() {
+        const page = document.getElementById('loginPage');
+        return Boolean(page) && !page.classList.contains('hide');
+    }
+
+    // Signed out: the same picker, without "you", settings or Manage profiles. Jellyfin's page stays
+    // underneath (Other ways to sign in) for manual sign-in, Quick Connect and "Forgot password".
+    async function openSignIn(page) {
+        const api = window.ApiClient;
+        if (!hasApi(api) || api.getCurrentUserId() || opening || isOpen()) {
+            return;
+        }
+
+        opening = true;
+        // Jellyfin's page stays hidden until the picker covers it (or won't), so it doesn't flash first;
+        // at most 3 s, in case the server is slow to answer.
+        page.style.visibility = 'hidden';
+        // Shown by then, the page may already be in use, so the picker stays away.
+        let revealed = false;
+        const reveal = setTimeout(() => {
+            revealed = true;
+            page.style.visibility = '';
+        }, 3000);
+        let users = [];
+        let settings = null;
+        let branding = null;
+        try {
+            [[users, settings], branding] = await Promise.all([load(api),
+                api.getJSON(api.getUrl('Branding/Configuration')).catch(() => null)]);
+        } catch (err) {
+            console.warn('[WhoIsWatching] could not load profiles', err);
+        } finally {
+            opening = false;
+        }
+
+        try {
+            // Nobody listed (every user hidden from login screens): Jellyfin's page as it is.
+            if (users.length && !revealed && onLoginPage() && !isOpen() && !api.getCurrentUserId()) {
+                trigger = null;
+                open(api, users, settings);
+                // Jellyfin's Login Disclaimer (house rules, legal notices) stays in sight, as plain text.
+                const disclaimer = pickPanel.querySelector('.wiw-disclaimer');
+                disclaimer.textContent = (branding && branding.LoginDisclaimer) || '';
+                disclaimer.hidden = !disclaimer.textContent.trim();
+                dialog.setAttribute('aria-describedby', disclaimer.hidden ? '' : disclaimer.id);
+            }
+        } catch (err) {
+            console.warn('[WhoIsWatching] could not show profiles', err);
+            closeDialog();
+        } finally {
+            clearTimeout(reveal);
+            page.style.visibility = '';
+        }
     }
 
     // The profiles and the brand settings, in parallel.
@@ -290,7 +384,7 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
         // users are already removed by the server.
         const users = await api.getJSON(api.getUrl('Users/Public'));
         const currentId = api.getCurrentUserId();
-        if (!users.some(u => u.Id === currentId)) {
+        if (currentId && !users.some(u => u.Id === currentId)) {
             // The signed-in user may be hidden from login screens; still show them as "you".
             users.unshift(await api.getCurrentUser());
         }
@@ -304,6 +398,8 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
         }
 
         managing = false;
+        pickPanel.querySelector('.wiw-disclaimer').hidden = true;
+        dialog.removeAttribute('aria-describedby');
         followTheme();
         showBrand(settings);
         render(api, users);
@@ -317,12 +413,12 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
         // Colour follows the user ID, so it is stable; collisions move to the next free colour.
         colors.clear();
         for (const user of users) {
-            let i = hash(user.Id) % COLORS.length;
-            while (colors.size < COLORS.length && Array.from(colors.values()).includes(COLORS[i])) {
-                i = (i + 1) % COLORS.length;
+            let i = hash(user.Id) % CARD_COLORS;
+            while (colors.size < CARD_COLORS && Array.from(colors.values()).includes(i + 1)) {
+                i = (i + 1) % CARD_COLORS;
             }
 
-            colors.set(user.Id, COLORS[i]);
+            colors.set(user.Id, i + 1);
         }
 
         const currentId = api.getCurrentUserId();
@@ -338,7 +434,8 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
         const manage = pickPanel.querySelector('[data-action=manage]');
         manage.textContent = managing ? TEXT.done : TEXT.manage;
         manage.hidden = !users.some(user => canEdit(api, user));
-        pickPanel.querySelector('[data-action=account]').hidden = managing;
+        pickPanel.querySelector('[data-action=account]').hidden = managing || !currentId;
+        pickPanel.querySelector('.wiw-other').hidden = Boolean(currentId);
     }
 
     // The administrator's brand text (plugin settings), in a corner like Netflix's logo.
@@ -364,10 +461,18 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
         const button = getComputedStyle(probe);
         const solid = button.backgroundColor !== 'rgba(0, 0, 0, 0)';
         const accent = solid ? button.backgroundColor : themeVariable('--jf-palette-primary-main');
-        const onAccent = solid ? button.color : themeVariable('--jf-palette-primary-contrastText');
         probe.remove();
         dialog.style.setProperty('--wiw-accent', accent || '#00a4dc');
-        dialog.style.setProperty('--wiw-on-accent', onAccent || '#fff');
+
+        // The page's own background: Custom CSS often paints body or .backgroundContainer, and theme
+        // images are URLs relative to Jellyfin's sheet, so the computed (absolute) values are copied.
+        // Nothing painted: the theme variables in CSS apply.
+        const transparent = 'rgba(0, 0, 0, 0)';
+        const painted = [document.querySelector('.backgroundContainer'), document.body, document.documentElement]
+            .map(el => el && getComputedStyle(el))
+            .find(style => style && (style.backgroundImage !== 'none' || style.backgroundColor !== transparent));
+        dialog.style.backgroundImage = painted && painted.backgroundImage !== 'none' ? painted.backgroundImage : '';
+        dialog.style.backgroundColor = painted && painted.backgroundColor !== transparent ? painted.backgroundColor : '';
     }
 
     function themeVariable(name) {
@@ -391,44 +496,54 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
         // Static markup only; user-provided values are always set through textContent/attributes.
         dialog.innerHTML = `
 <p class="wiw-brand" aria-hidden="true" hidden></p>
-<button type="button" class="wiw-close" data-action="close" aria-label="${TEXT.close}">${icon(ICON_CLOSE)}</button>
+<button type="button" class="wiw-close paper-icon-button-light" data-action="close" aria-label="${TEXT.close}">${icon(ICON_CLOSE)}</button>
 <section class="wiw-panel wiw-pick">
  <h1 class="wiw-title" id="wiw-title">${TEXT.title}</h1>
  <ul class="wiw-grid"></ul>
  <p class="wiw-error" role="alert"></p>
+ <p class="wiw-disclaimer loginDisclaimer" id="wiw-disclaimer" hidden></p>
  <div class="wiw-actions">
-  <button type="button" class="wiw-button" data-action="manage">${TEXT.manage}</button>
-  <button type="button" class="wiw-icon" data-action="account" aria-label="${TEXT.account}" title="${TEXT.account}">${icon(ICON_SETTINGS)}</button>
+  <button type="button" class="wiw-button emby-button raised" data-action="manage">${TEXT.manage}</button>
+  <button type="button" class="wiw-button emby-button raised wiw-other" data-action="close">${TEXT.otherSignIn}</button>
+  <button type="button" class="wiw-icon paper-icon-button-light" data-action="account" aria-label="${TEXT.account}" title="${TEXT.account}">${icon(ICON_SETTINGS)}</button>
  </div>
 </section>
 <section class="wiw-panel wiw-pictures" hidden>
- <h1 class="wiw-title">${TEXT.choosePicture}</h1>
+ <h1 class="wiw-title" id="wiw-title-pictures">${TEXT.choosePicture}</h1>
  <div class="wiw-for"></div>
+ <p class="wiw-error" role="alert"></p>
  <ul class="wiw-gallery"></ul>
  <input class="wiw-file" type="file" accept="image/*" hidden>
- <p class="wiw-error" role="alert"></p>
- <button type="button" class="wiw-button" data-action="back">${TEXT.back}</button>
+ <button type="button" class="wiw-button emby-button raised" data-action="back">${TEXT.back}</button>
 </section>
 <section class="wiw-panel wiw-confirm" hidden>
- <h1 class="wiw-title">${TEXT.confirmPicture}</h1>
+ <h1 class="wiw-title" id="wiw-title-confirm">${TEXT.confirmPicture}</h1>
  <div class="wiw-compare"><figure class="wiw-old"></figure>${icon(ICON_ARROW)}<figure class="wiw-new"></figure></div>
  <p class="wiw-error" role="alert"></p>
  <div class="wiw-actions">
-  <button type="button" class="wiw-button" data-action="back">${TEXT.notYet}</button>
-  <button type="button" class="wiw-button wiw-primary" data-action="apply">${TEXT.letsDoIt}</button>
+  <button type="button" class="wiw-button emby-button raised" data-action="back">${TEXT.notYet}</button>
+  <button type="button" class="wiw-button emby-button raised button-submit" data-action="apply">${TEXT.letsDoIt}</button>
  </div>
 </section>
 <form class="wiw-panel wiw-auth" hidden>
- <div class="wiw-who"></div>
+ <div class="wiw-who wiw-for"></div>
  <input class="wiw-username" type="text" autocomplete="username" hidden>
- <label class="wiw-field">${TEXT.password}<input class="wiw-input" type="password" autocomplete="current-password" aria-describedby="wiw-hint"><span class="wiw-hint" id="wiw-hint">${TEXT.passwordHint}</span></label>
- <label class="wiw-check"><input class="wiw-remember" type="checkbox" aria-describedby="wiw-remember-hint">${TEXT.remember}<span class="wiw-hint" id="wiw-remember-hint">${TEXT.rememberHint}</span></label>
+ <label class="wiw-field"><span class="inputLabel">${TEXT.password}</span><input class="wiw-input emby-input" type="password" autocomplete="current-password" aria-describedby="wiw-hint"><span class="wiw-hint fieldDescription" id="wiw-hint">${TEXT.passwordHint}</span></label>
+ <div class="wiw-check checkboxContainer">
+  <label class="emby-checkbox-label"><input class="wiw-remember emby-checkbox" type="checkbox" aria-describedby="wiw-remember-hint"><span class="checkboxLabel">${TEXT.remember}</span><span class="checkboxOutline"><span class="material-icons checkboxIcon checkboxIcon-checked check" aria-hidden="true"></span><span class="material-icons checkboxIcon checkboxIcon-unchecked" aria-hidden="true"></span></span></label>
+  <span class="wiw-hint fieldDescription checkboxFieldDescription" id="wiw-remember-hint">${TEXT.rememberHint}</span>
+ </div>
  <p class="wiw-error" role="alert"></p>
  <div class="wiw-actions">
-  <button type="button" class="wiw-button" data-action="back">${TEXT.back}</button>
-  <button type="submit" class="wiw-button wiw-primary">${TEXT.signIn}</button>
+  <button type="button" class="wiw-button emby-button raised" data-action="back">${TEXT.back}</button>
+  <button type="submit" class="wiw-button emby-button raised button-submit">${TEXT.signIn}</button>
  </div>
 </form>`;
+        // Jellyfin's TV layout enlarges the focused button (show-focus) so it can be seen from the sofa.
+        if (isTv()) {
+            dialog.querySelectorAll('.emby-button, .paper-icon-button-light').forEach(el => el.classList.add('show-focus'));
+        }
+
         pickPanel = dialog.querySelector('.wiw-pick');
         picturesPanel = dialog.querySelector('.wiw-pictures');
         confirmPanel = dialog.querySelector('.wiw-confirm');
@@ -487,6 +602,12 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
         dialog.addEventListener('close', () => {
             authPanel.querySelector('.wiw-input').value = '';
             pending = null;
+            // Closed over the sign-in page: focus moves on to Jellyfin's own, for keyboards and remotes.
+            const first = !trigger && onLoginPage() && Array.from(document.querySelectorAll('#loginPage button, #loginPage [tabindex="0"]'))
+                .find(el => el.getClientRects().length); // shown: Jellyfin hides its other forms
+            if (first) {
+                first.focus();
+            }
         });
 
         dialog.addEventListener('keydown', onKeyDown);
@@ -586,11 +707,16 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
 
     function avatar(api, user, pencil) {
         const el = document.createElement('span');
-        el.className = 'wiw-avatar';
+        el.className = 'wiw-avatar cardImageContainer defaultCardBackground defaultCardBackground' + colors.get(user.Id);
         el.setAttribute('aria-hidden', 'true');
-        // The initial, unless the pencil covers the picture.
-        el.textContent = pencil ? '' : (Array.from((user.Name || '').trim())[0] || '?').toUpperCase();
-        el.style.setProperty('--wiw-color', colors.get(user.Id));
+        // The initial, unless the pencil covers the picture. It has its own element so the avatar
+        // keeps the base font size, which the theme's card rounding (in em) is measured against.
+        if (!pencil) {
+            const initial = document.createElement('span');
+            initial.className = 'wiw-initial';
+            initial.textContent = (Array.from((user.Name || '').trim())[0] || '?').toUpperCase();
+            el.append(initial);
+        }
         if (user.PrimaryImageTag) {
             const img = document.createElement('img');
             img.alt = '';
@@ -762,6 +888,9 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
         for (const el of dialog.querySelectorAll('.wiw-panel')) {
             el.hidden = el !== panel;
         }
+
+        // Screen readers name the dialog after the page shown (the password step keeps "Who's watching?").
+        dialog.setAttribute('aria-labelledby', (panel.querySelector('.wiw-title') || pickPanel.querySelector('.wiw-title')).id);
     }
 
     function showPick() {
@@ -790,6 +919,9 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
         setError('');
         let keepPrevious;
         let result;
+        // Jellyfin keeps a session across reloads only with its "Remember me" on (its default). Off, the
+        // reload below would land on the sign-in page again, so it is on for this sign-in (back if it fails).
+        const autoLogin = setAutoLogin('true');
         try {
             // The previous profile stays signed in here only if it is remembered and not an administrator.
             keepPrevious = Boolean(tokens[previousId]) && !isAdmin(await api.getCurrentUser());
@@ -799,6 +931,7 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
                 ? await resume(api, user, tokens[user.Id])
                 : await api.authenticateUserByName(user.Name, password);
         } catch (err) {
+            setAutoLogin(autoLogin);
             setBusy(false);
             return err || {};
         }
@@ -822,14 +955,35 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
 
         // The server only replaces tokens of the *same* user on this device, so end the previous
         // profile's session explicitly instead of leaving a live token behind, unless it is remembered.
-        if (!keepPrevious) {
+        if (!keepPrevious && previousToken) {
             await revoke(api, previousToken);
         }
 
         // Full reload, without the old route: nothing the previous profile loaded (cached queries,
-        // views, player state) survives into the new one.
-        location.replace(location.pathname + location.search);
+        // views, player state) survives into the new one. From the sign-in page, go where it was
+        // taking the user (its url parameter, a route inside Jellyfin Web), as Jellyfin's page does.
+        // A change of hash alone wouldn't reload, so set the address first, then reload it.
+        const next = !previousId && new URLSearchParams(location.hash.split('?')[1] || '').get('url');
+        const route = next && /^\/(?!\/|login)/.test(next) ? '#' + next : ''; // a route like /details?id=…
+        history.replaceState(null, '', location.pathname + location.search + route);
+        location.reload();
         return new Promise(() => {});
+    }
+
+    // Sets Jellyfin's "Remember me" (null: unset) and returns what it was.
+    function setAutoLogin(value) {
+        try {
+            const previous = localStorage.getItem('enableAutoLogin');
+            if (value === null) {
+                localStorage.removeItem('enableAutoLogin');
+            } else {
+                localStorage.setItem('enableAutoLogin', value);
+            }
+
+            return previous;
+        } catch (err) {
+            return null; // storage unavailable: Jellyfin can't keep a session across reloads either
+        }
     }
 
     // Signs in with a remembered token the way Jellyfin Web does once a password is accepted. The
@@ -912,17 +1066,17 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
         const tiles = ids.map((id, i) => {
             const tile = document.createElement('button');
             tile.type = 'button';
-            tile.className = 'wiw-tile';
+            tile.className = 'wiw-tile cardImageContainer';
             tile.dataset.id = id;
             tile.setAttribute('aria-label', `${TEXT.galleryPicture} ${i + 1}`);
             tile.append(galleryImage(api, id));
             tile.addEventListener('click', () => choose(api, id));
             return tile;
         });
-        if (canAdd(api)) {
+        if (canAdd(api) && !isTv()) {
             const add = document.createElement('button');
             add.type = 'button';
-            add.className = 'wiw-tile wiw-add';
+            add.className = 'wiw-tile wiw-add cardImageContainer';
             add.setAttribute('data-action', 'add');
             add.setAttribute('aria-label', TEXT.addPicture);
             add.title = TEXT.addPicture;
@@ -938,7 +1092,7 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
         if (!items.length) {
             const empty = document.createElement('li');
             empty.className = 'wiw-hint';
-            empty.textContent = TEXT.noPictures;
+            empty.textContent = TEXT.noPictures + (isTv() ? ' ' + TEXT.addElsewhere : '');
             items.push(empty);
         }
 
@@ -962,7 +1116,7 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
 
         chosen = id;
         const picture = document.createElement('span');
-        picture.className = 'wiw-avatar';
+        picture.className = 'wiw-avatar cardImageContainer';
         picture.append(galleryImage(api, id));
         fill(confirmPanel.querySelector('.wiw-old'), avatar(api, editing), caption(TEXT.currentPicture));
         fill(confirmPanel.querySelector('.wiw-new'), picture, caption(TEXT.newPicture));
@@ -1025,7 +1179,8 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
 
             id = (await response.json()).Id;
         } catch (err) {
-            setError(TEXT.pictureFailed);
+            // 409: the gallery, or this person's share of it, is full
+            setError(err && err.status === 409 ? TEXT.galleryFull : TEXT.pictureFailed);
         }
 
         await loadGallery(api);
@@ -1090,7 +1245,7 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
 
         // TV remotes' OK key is Enter, which would submit the form instead of ticking the box.
         if (e.key === 'Enter' && e.target.classList.contains('wiw-remember')
-            && document.documentElement.classList.contains('layout-tv')) {
+            && isTv()) {
             e.preventDefault();
             e.target.click();
             return;
@@ -1104,7 +1259,7 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
 
         const panel = dialog.querySelector('.wiw-panel:not([hidden])');
         const items = Array.from(dialog.querySelectorAll('.wiw-close, .wiw-panel button, .wiw-input, .wiw-remember'))
-            .filter(el => !el.disabled && el.getClientRects().length
+            .filter(el => !el.disabled && !el.hasAttribute('aria-disabled') && el.getClientRects().length
                 && (el.closest('.wiw-panel') === panel || el.classList.contains('wiw-close')));
         const next = nearest(items, document.activeElement, e.key);
         if (next) {
@@ -1133,7 +1288,9 @@ button.wiw-profile:hover .wiw-avatar,button.wiw-profile:focus-visible .wiw-avata
             const along = { ArrowLeft: -dx, ArrowRight: dx, ArrowUp: -dy, ArrowDown: dy }[key];
             const across = Math.abs(horizontal ? dy : dx);
             const score = along + across * 2;
-            if (el !== from && along > 1 && score < bestScore) {
+            // The corner X only by going up, so a stray Left/Right can't close the picker mid-task.
+            const corner = horizontal && el.classList.contains('wiw-close');
+            if (el !== from && !corner && along > 1 && score < bestScore) {
                 best = el;
                 bestScore = score;
             }
