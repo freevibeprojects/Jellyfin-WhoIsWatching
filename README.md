@@ -102,7 +102,7 @@ The end-to-end test runs once more with these APIs removed (`OLD_ENGINE=1`).
    - Jellyfin Desktop / Media Player: restart the app.
    - **Android app: swipe it away (or Force stop) and reopen it.** It keeps its page loaded in the background.
 2. **Another profile must be visible to the signed-in user.** The picker lists the profiles the sign-in screen shows, plus yourself. If every other account has *Hide this user from login screens* ticked (Jellyfin 12's default for new users), there is nothing to switch to and the avatar keeps its normal action. Fix it in *Dashboard → Users → (user) → Profile*.
-3. **Check the console** (F12 in browsers). `[WhoIsWatching] 1.4.0.0 loaded` confirms the script is there, and a second `[WhoIsWatching]` line says why the avatar was left alone.
+3. **Check the console** (F12 in browsers). `[WhoIsWatching] 1.4.1.0 loaded` confirms the script is there, and a second `[WhoIsWatching]` line says why the avatar was left alone.
 
 ## Compatibility surface
 

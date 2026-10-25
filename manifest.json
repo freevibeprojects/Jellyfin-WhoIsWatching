@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.4.1.0",
+        "changelog": "Adding a photo to the gallery is lighter on phones: the full-size photo is freed from memory as soon as it is shrunk, instead of being held through the upload.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/freevibeprojects/Jellyfin-WhoIsWatching/main/releases/who-is-watching_1.4.1.0.zip",
+        "checksum": "56b42ef06f5359b9753c976abaa7872a",
+        "timestamp": "2026-10-25T22:42:24Z"
+      },
+      {
         "version": "1.4.0.0",
         "changelog": "The picker now greets you on the sign-in page (first visit, after signing out), with Jellyfin's page one tap away for manual sign-in, Quick Connect and Forgot password, and the Login Disclaimer shown. It is styled by the active theme like Jellyfin's own pages: Jellyfin's buttons, fields, checkbox and card colours, no rounding unless the theme rounds, and the page's own background. Switching works where Jellyfin's Remember me was unticked. TV layout: no file picker, clearer focus. Each person may add up to 20 gallery pictures, and only whole JPEGs.",
         "targetAbi": "12.0.0.0",
