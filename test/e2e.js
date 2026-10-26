@@ -100,7 +100,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('ArrowDown');
   ok(await page.evaluate(() => document.activeElement.dataset.action) === 'manage', 'ArrowDown from any profile goes to Manage profiles, not the gear');
-  ok(await page.$eval('[data-action=account]', b => b.getAttribute('aria-label') === 'Account settings' && !!b.querySelector('svg')), 'Account settings is a gear icon');
+  ok(await page.$eval('[data-action=account]', b => b.title === 'Account settings' && !b.hasAttribute('aria-label') && !!b.querySelector('svg')), 'Account settings is a gear icon');
   await page.keyboard.press('Escape');
   ok(!(await page.$('.wiw[open]')), 'Escape closes');
   // keyboards and TV remotes move focus to the avatar before pressing OK: focus starts the loading

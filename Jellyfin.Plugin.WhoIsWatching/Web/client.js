@@ -439,7 +439,9 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
                 const disclaimer = pickPanel.querySelector('.wiw-disclaimer');
                 disclaimer.textContent = (branding && branding.LoginDisclaimer) || '';
                 disclaimer.hidden = !disclaimer.textContent.trim();
-                dialog.setAttribute('aria-describedby', disclaimer.hidden ? '' : disclaimer.id);
+                if (!disclaimer.hidden) {
+                    dialog.setAttribute('aria-describedby', disclaimer.id);
+                }
                 followLateStyles();
             }
         } catch (err) {
@@ -710,7 +712,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
  <div class="wiw-actions">
   <button type="button" class="wiw-button emby-button raised" data-action="manage">${TEXT.manage}</button>
   <button type="button" class="wiw-button emby-button raised wiw-other" data-action="close">${TEXT.otherSignIn}</button>
-  <button type="button" class="wiw-icon paper-icon-button-light" data-action="account" aria-label="${TEXT.account}" title="${TEXT.account}">${icon(ICON_SETTINGS)}</button>
+  <button type="button" class="wiw-icon paper-icon-button-light" data-action="account" title="${TEXT.account}">${icon(ICON_SETTINGS)}</button>
  </div>
 </section>
 <section class="wiw-panel wiw-pictures" hidden>
@@ -733,7 +735,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 <form class="wiw-panel wiw-auth" hidden>
  <div class="wiw-who wiw-for"></div>
  <label class="wiw-field wiw-account" hidden><span class="inputLabel">${TEXT.username}</span><input class="wiw-username emby-input" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" enterkeyhint="next" required></label>
- <label class="wiw-field"><span class="inputLabel">${TEXT.password}</span><input class="wiw-input emby-input" type="password" autocomplete="current-password" aria-describedby="wiw-hint"><span class="wiw-hint fieldDescription" id="wiw-hint">${TEXT.passwordHint}</span></label>
+ <label class="wiw-field"><span class="inputLabel" id="wiw-password-label">${TEXT.password}</span><input class="wiw-input emby-input" type="password" autocomplete="current-password" aria-labelledby="wiw-title-auth wiw-password-label" aria-describedby="wiw-hint"><span class="wiw-hint fieldDescription" id="wiw-hint">${TEXT.passwordHint}</span></label>
  <div class="wiw-check checkboxContainer">
   <label class="emby-checkbox-label"><input class="wiw-remember emby-checkbox" type="checkbox" aria-describedby="wiw-remember-hint"><span class="checkboxLabel">${TEXT.remember}</span><span class="checkboxOutline"><span class="material-icons checkboxIcon checkboxIcon-checked check" aria-hidden="true"></span><span class="material-icons checkboxIcon checkboxIcon-unchecked" aria-hidden="true"></span></span></label>
   <span class="wiw-hint fieldDescription checkboxFieldDescription" id="wiw-remember-hint">${TEXT.rememberHint}</span>
@@ -1014,6 +1016,12 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     function askPassword(api, user, button, token) {
         pending = { user, button };
         fill(authPanel.querySelector('.wiw-who'), profile(api, user, 'div'));
+        // The step is named after the profile, for screen readers: a heading, the dialog's name, and
+        // the password field's ("Bob Password").
+        const name = authPanel.querySelector('.wiw-who .wiw-name');
+        name.id = 'wiw-title-auth';
+        name.setAttribute('role', 'heading');
+        name.setAttribute('aria-level', '1');
         authPanel.querySelector('.wiw-account').hidden = Boolean(user);
         authPanel.querySelector('.wiw-username').value = user ? user.Name : '';
         authPanel.querySelector('.wiw-check').hidden = !user || !canRemember(api) || isAdmin(user);
@@ -1145,7 +1153,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         }
 
         // Screen readers name the dialog after the page shown (the password step keeps "Who's watching?").
-        dialog.setAttribute('aria-labelledby', (panel.querySelector('.wiw-title') || pickPanel.querySelector('.wiw-title')).id);
+        dialog.setAttribute('aria-labelledby', (panel.querySelector('[id^="wiw-title"]') || pickPanel.querySelector('.wiw-title')).id);
     }
 
     function showPick() {
@@ -1339,7 +1347,6 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             add.type = 'button';
             add.className = 'wiw-tile wiw-add cardImageContainer';
             add.setAttribute('data-action', 'add');
-            add.setAttribute('aria-label', TEXT.addPicture);
             add.title = TEXT.addPicture;
             add.innerHTML = icon(ICON_ADD);
             tiles.unshift(add);
