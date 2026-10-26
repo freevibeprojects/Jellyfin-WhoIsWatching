@@ -21,6 +21,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   page.on('console', m => { if (m.type() === 'info' && m.text().startsWith('[WhoIsWatching]')) notes.push(m.text()); });
   const auths = [];
   page.on('request', r => { if (/authenticatebyname/i.test(r.url())) auths.push(r.postData()); });
+  await page.addInitScript(() => { window.notices = []; new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType === 1 && /^Signing in as /.test(n.textContent)) window.notices.push(n.textContent); }))).observe(document, { childList: true, subtree: true }); });
   const layout = process.argv[2]; // e.g. desktop-legacy, tv; default: the server's default layout
   if (layout) await page.addInitScript(l => localStorage.setItem('layout', l), layout);
   // OLD_ENGINE=1: run everything without <dialog>, replaceChildren and createImageBitmap, like older
@@ -323,6 +324,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await avatar.waitFor({ timeout: 30000 });
   await page.waitForFunction(() => window.ApiClient && window.ApiClient.getCurrentUserId());
   ok(await me() === 'Bob', 'switched to Bob');
+  ok(JSON.stringify(await page.evaluate(() => window.notices)) === '["Signing in as Bob…"]' && !(await page.evaluate(() => Array.from(document.querySelectorAll('[role=status]')).some(e => /^Signing in as /.test(e.textContent)))), 'while Jellyfin started again, the screen said who was being signed in, and that went once a page showed');
   const bobId = await page.evaluate(() => window.ApiClient.getCurrentUserId());
   const bobToken = await page.evaluate(() => window.ApiClient.accessToken());
   ok((await remembered())[bobId] === bobToken, 'Bob remembered on this device (his token)');

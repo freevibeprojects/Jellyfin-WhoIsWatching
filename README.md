@@ -14,7 +14,7 @@ if needed, and you are now that user.
 
 | Piece | What it does |
 |---|---|
-| `ScriptInjection.cs` | An ASP.NET Core `IStartupFilter`, registered through Jellyfin's `IPluginServiceRegistrator`. When `…/web/` or `…/web/index.html` is served, it appends `<script defer src="../WhoIsWatching/client.js?v=…">`. Nothing is written to disk, so read-only installs (Docker, distro packages) work. Every other request costs one string comparison. |
+| `ScriptInjection.cs` | An ASP.NET Core `IStartupFilter`, registered through Jellyfin's `IPluginServiceRegistrator`. When `…/web/` or `…/web/index.html` is served, it appends `<script async src="../WhoIsWatching/client.js?v=…">`. Nothing is written to disk, so read-only installs (Docker, distro packages) work. Every other request costs one string comparison. |
 | `ClientScriptController.cs` | Serves the embedded script (`GET /WhoIsWatching/client.js`) anonymously. It is static and holds no data. |
 | `GalleryController.cs` | The brand-text settings (`GET /WhoIsWatching/Settings`, anonymous, because the sign-in page shows the brand text) and the shared picture gallery (`/WhoIsWatching/Images`). See *Profile pictures*. |
 | `Web/client.js` | Covers Jellyfin's sign-in page with the picker, and intercepts clicks on the avatar button to show it. It switches users with Jellyfin's own client API, then reloads the page. *Manage profiles* changes pictures; the gear runs the avatar button's normal action (settings or user menu). |
@@ -25,7 +25,7 @@ The switch uses only what the login page uses:
 1. The profile list comes from `GET /Users/Public`, the login screen's own list. The server has already applied every rule: *Hide this user from login screens*, disabled accounts, device access, and remote-access restrictions.
 2. Sign-in goes through `ApiClient.authenticateUserByName`, which is the login page's call to `POST /Users/AuthenticateByName`. The web client stores the new session exactly as after a normal sign-in.
 3. The previous user's token is revoked with `POST /Sessions/Logout`. This is needed because Jellyfin only replaces tokens of the *same* user on a device, so without it the old token would stay valid.
-4. The page fully reloads to the home screen. Many of jellyfin-web's query-cache keys don't include the user ID, so switching without a reload could show the previous profile's cached rows (for example, an adult's suggestions on a child's profile).
+4. The page fully reloads to the home screen (saying "Signing in as …" until Jellyfin Web has started again, which takes seconds on a TV). Many of jellyfin-web's query-cache keys don't include the user ID, so switching without a reload could show the previous profile's cached rows (for example, an adult's suggestions on a child's profile).
 
 There is no new authentication endpoint, session store, cookie or cryptography. The plugin's own endpoints only serve its script, its settings and the picture gallery.
 

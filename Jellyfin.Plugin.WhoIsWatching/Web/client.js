@@ -42,6 +42,7 @@
         otherAccount: 'Other account',
         signIn: 'Sign in',
         signingIn: 'Signing in…',
+        signingInAs: 'Signing in as',
         back: 'Back',
         passwordHint: 'Leave empty if this profile has no password.',
         remember: 'Remember on this device',
@@ -70,6 +71,7 @@
     // Chrome 66, Safari 13, Firefox 133: fetch's keepalive (a request that finishes after the page goes).
     const KEEPALIVE = typeof Request === 'function' && 'keepalive' in Request.prototype;
     const PASSWORDLESS_KEY = 'whoiswatching-passwordless-';
+    const SWITCH_KEY = 'whoiswatching-switching'; // sessionStorage: who the reload after a sign-in is for
     const REMEMBERED_KEY = 'whoiswatching-remembered-';
     const CARD_COLORS = 5; // the theme's defaultCardBackground1..5, as on Jellyfin's sign-in page
     // Material icons (Apache 2.0): close, settings, edit, add, arrow, person.
@@ -246,7 +248,16 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     // Jellyfin's sign-in page (every page Jellyfin shows fires viewbeforeshow and viewshow; they don't
     // always bubble, so they are caught on the way down), including one shown before this script ran.
     // Any other page showing (the browser's Back button) closes the picker.
+    // After a sign-in the page reloads, and Jellyfin Web takes a while to start again (seconds on a TV),
+    // so until it shows its first page the screen says who is being signed in.
+    let cover = showSwitching();
+
     const onView = e => {
+        if (cover) {
+            cover.remove();
+            cover = null;
+        }
+
         if (e.target.id === 'loginPage') {
             openSignIn(e.target);
             if (e.type === 'viewshow') {
@@ -1242,8 +1253,47 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         const next = !previousId && (/^\/login/.test(hash) ? new URLSearchParams(hash.split('?')[1] || '').get('url') : hash);
         const route = next && /^\/(?!\/|login)/.test(next) ? '#' + next : ''; // a route like /details?id=…
         history.replaceState(null, '', location.pathname + location.search + route);
+        noteSwitch(result.User.Name);
         location.reload();
         return new Promise(() => {});
+    }
+
+    // Remembers, for the reload that follows, who is being signed in and the picker's colours.
+    function noteSwitch(name) {
+        try {
+            const style = getComputedStyle(dialog);
+            sessionStorage.setItem(SWITCH_KEY, JSON.stringify({ name, at: Date.now(), background: style.backgroundColor, color: style.color }));
+        } catch (err) {
+            // Storage unavailable: the reload shows Jellyfin's own start-up screen.
+        }
+    }
+
+    // Right after that reload: "Signing in as Kid…" over Jellyfin's start-up screen. Values of the wrong
+    // shape are ignored; the name is only ever text.
+    function showSwitching() {
+        let next = null;
+        try {
+            next = JSON.parse(sessionStorage.getItem(SWITCH_KEY));
+            sessionStorage.removeItem(SWITCH_KEY);
+        } catch (err) {
+            return null;
+        }
+
+        if (!next || typeof next.name !== 'string' || !(Date.now() - next.at < 60000)) {
+            return null;
+        }
+
+        const colour = value => (/^rgba?\([\d.,\s]+\)$/.test(value) ? value : '');
+        const el = document.createElement('div');
+        el.setAttribute('role', 'status');
+        el.style.cssText = 'position:fixed;top:0;right:0;bottom:0;left:0;z-index:2147483646;display:flex;align-items:center;'
+            + 'justify-content:center;padding:1em;text-align:center;font-size:2em';
+        el.style.backgroundColor = colour(next.background) || '#101010';
+        el.style.color = colour(next.color) || '#fff';
+        el.textContent = `${TEXT.signingInAs} ${next.name}…`;
+        document.body.append(el);
+        setTimeout(() => el.remove(), 30000); // Jellyfin never got to a page: out of the way anyway
+        return el;
     }
 
     // Resolves once Jellyfin Web shows a page (it has finished starting), or at the deadline.

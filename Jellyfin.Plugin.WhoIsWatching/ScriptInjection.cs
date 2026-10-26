@@ -32,9 +32,10 @@ public sealed class ScriptInjectionStartupFilter : IStartupFilter
 /// </summary>
 public sealed class ScriptInjectionMiddleware
 {
-    // Relative to ".../web/", so it resolves correctly under any BaseUrl or reverse-proxy prefix.
+    // Relative to ".../web/", so it resolves correctly under any BaseUrl or reverse-proxy prefix. Async:
+    // it runs as soon as it is there (at once from the cache), before or after Jellyfin's own code.
     private static readonly byte[] ScriptTag = Encoding.UTF8.GetBytes(
-        $"<script defer src=\"../WhoIsWatching/client.js?v={typeof(Plugin).Assembly.GetName().Version}\"></script>");
+        $"<script async src=\"../WhoIsWatching/client.js?v={typeof(Plugin).Assembly.GetName().Version}\"></script>");
 
     private readonly RequestDelegate _next;
 
