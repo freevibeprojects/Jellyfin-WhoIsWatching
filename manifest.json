@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.5.0.0",
+        "changelog": "Other account: sign in to an account hidden from the sign-in screen (such as the administrator's) without signing out first. The sign-in picker now appears before Jellyfin's own page, in the server's Custom CSS from the start, and after signing in the screen says who is being signed in while Jellyfin starts. Opens at once from TV remotes and keyboards, is bigger on TVs, fits big households, and works with high contrast and screen readers. Safer: signing out always forgets remembered profiles, gallery uploads can't declare huge pictures or tie up server memory, and a sign-in can no longer be undone by Jellyfin's start-up.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/freevibeprojects/Jellyfin-WhoIsWatching/main/releases/who-is-watching_1.5.0.0.zip",
+        "checksum": "01e183c0ff7ce3dd64f856cd34648194",
+        "timestamp": "2026-10-26T22:45:33Z"
+      },
+      {
         "version": "1.4.2.0",
         "changelog": "The sign-in page opens instantly again: the profiles and their pictures are loaded while Jellyfin starts (and when you sign out), so the picker is ready the moment the page is, with no fade-in.",
         "targetAbi": "12.0.0.0",
