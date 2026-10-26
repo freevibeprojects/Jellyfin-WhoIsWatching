@@ -483,6 +483,10 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.click('.wiw-grid li:last-child button');
   await page.waitForSelector('.wiw-auth:not([hidden]) .wiw-username:focus');
   ok(await page.textContent('.wiw-auth .wiw-name') === 'Other account' && !(await page.isVisible('.wiw-remember')), 'Other account asks for a name, without Remember on this device');
+  const beforeEmpty = auths.length;
+  await page.click('.wiw-auth button[type=submit]');
+  await page.waitForTimeout(300);
+  ok(auths.length === beforeEmpty && (await page.textContent('.wiw-auth .wiw-error')).startsWith('Enter the account') && await page.evaluate(() => document.activeElement.classList.contains('wiw-username')), 'Other account with no name says so in the picker, with no sign-in attempt');
   await page.fill('.wiw-username', 'Hidden');
   const triesBefore = auths.length;
   await page.keyboard.press('Enter'); // a phone's Next: on to the password, no blank attempt

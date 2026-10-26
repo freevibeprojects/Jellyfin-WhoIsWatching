@@ -46,6 +46,7 @@
         back: 'Back',
         passwordHint: 'Leave empty if this profile has no password.',
         accountPasswordHint: 'Leave empty if this account has no password.',
+        enterName: 'Enter the account’s username.',
         remember: 'Remember on this device',
         rememberHint: 'Anyone using this device can then open this profile without the password, until someone signs out.',
         otherSignIn: 'Other ways to sign in',
@@ -777,7 +778,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 </section>
 <form class="wiw-panel wiw-auth" hidden>
  <div class="wiw-who wiw-for"></div>
- <label class="wiw-field wiw-account" hidden><span class="inputLabel">${TEXT.username}</span><input class="wiw-username emby-input" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" enterkeyhint="next" required></label>
+ <label class="wiw-field wiw-account" hidden><span class="inputLabel">${TEXT.username}</span><input class="wiw-username emby-input" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" enterkeyhint="next"></label>
  <label class="wiw-field"><span class="inputLabel" id="wiw-password-label">${TEXT.password}</span><input class="wiw-input emby-input" type="password" autocomplete="current-password" aria-labelledby="wiw-title-auth wiw-password-label" aria-describedby="wiw-hint"><span class="wiw-hint fieldDescription" id="wiw-hint">${TEXT.passwordHint}</span></label>
  <div class="wiw-check checkboxContainer">
   <label class="emby-checkbox-label"><input class="wiw-remember emby-checkbox" type="checkbox" aria-describedby="wiw-remember-hint"><span class="checkboxLabel">${TEXT.remember}</span><span class="checkboxOutline"><span class="material-icons checkboxIcon checkboxIcon-checked check" aria-hidden="true"></span><span class="material-icons checkboxIcon checkboxIcon-unchecked" aria-hidden="true"></span></span></label>
@@ -841,6 +842,14 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 
         authPanel.addEventListener('submit', async e => {
             e.preventDefault();
+            // Other account with no name: said in the picker's own words, not the browser's bubble.
+            const name = authPanel.querySelector('.wiw-username');
+            if (!pending.user && !name.value.trim()) {
+                setError(TEXT.enterName);
+                name.focus();
+                return;
+            }
+
             const input = authPanel.querySelector('.wiw-input');
             const password = input.value;
             input.value = '';
