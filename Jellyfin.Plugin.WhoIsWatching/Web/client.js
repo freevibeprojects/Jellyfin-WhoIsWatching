@@ -704,7 +704,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 </section>
 <form class="wiw-panel wiw-auth" hidden>
  <div class="wiw-who wiw-for"></div>
- <label class="wiw-field wiw-account" hidden><span class="inputLabel">${TEXT.username}</span><input class="wiw-username emby-input" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
+ <label class="wiw-field wiw-account" hidden><span class="inputLabel">${TEXT.username}</span><input class="wiw-username emby-input" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" enterkeyhint="next" required></label>
  <label class="wiw-field"><span class="inputLabel">${TEXT.password}</span><input class="wiw-input emby-input" type="password" autocomplete="current-password" aria-describedby="wiw-hint"><span class="wiw-hint fieldDescription" id="wiw-hint">${TEXT.passwordHint}</span></label>
  <div class="wiw-check checkboxContainer">
   <label class="emby-checkbox-label"><input class="wiw-remember emby-checkbox" type="checkbox" aria-describedby="wiw-remember-hint"><span class="checkboxLabel">${TEXT.remember}</span><span class="checkboxOutline"><span class="material-icons checkboxIcon checkboxIcon-checked check" aria-hidden="true"></span><span class="material-icons checkboxIcon checkboxIcon-unchecked" aria-hidden="true"></span></span></label>
@@ -755,6 +755,14 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             file.value = '';
             if (image) {
                 addPicture(window.ApiClient, image);
+            }
+        });
+
+        // Enter (a phone keyboard's Next) in the name moves on to the password instead of trying a blank one.
+        authPanel.querySelector('.wiw-username').addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                authPanel.querySelector('.wiw-input').focus();
             }
         });
 

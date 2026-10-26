@@ -444,6 +444,10 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.waitForSelector('.wiw-auth:not([hidden]) .wiw-username:focus');
   ok(await page.textContent('.wiw-auth .wiw-name') === 'Other account' && !(await page.isVisible('.wiw-remember')), 'Other account asks for a name, without Remember on this device');
   await page.fill('.wiw-username', 'Hidden');
+  const triesBefore = auths.length;
+  await page.keyboard.press('Enter'); // a phone's Next: on to the password, no blank attempt
+  await page.waitForTimeout(300);
+  ok(auths.length === triesBefore && await page.evaluate(() => document.activeElement.classList.contains('wiw-input')), 'Enter in the name moves to the password without trying a blank one');
   await Promise.all([page.waitForEvent('load'), page.keyboard.press('Enter')]);
   await avatar.waitFor({ timeout: 30000 });
   ok(await me() === 'Hidden', 'switched to an account hidden from the sign-in screen, without signing out');
