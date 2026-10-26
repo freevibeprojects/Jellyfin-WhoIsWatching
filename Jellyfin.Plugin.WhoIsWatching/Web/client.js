@@ -41,6 +41,7 @@
         username: 'Username',
         otherAccount: 'Other account',
         signIn: 'Sign in',
+        signingIn: 'Signing in…',
         back: 'Back',
         passwordHint: 'Leave empty if this profile has no password.',
         remember: 'Remember on this device',
@@ -113,7 +114,7 @@
 button.wiw-profile:hover,button.wiw-profile:focus-visible{color:var(--jf-palette-text-primary,#fff)}
 button.wiw-profile:hover .wiw-avatar{transform:scale(1.04)}
 button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u)) var(--jf-palette-text-primary,#fff);transform:scale(1.04)}
-.wiw-busy .wiw-avatar{animation:wiw-pulse 1s ease-in-out infinite}
+.wiw-busy .wiw-avatar,.wiw[aria-busy=true] .wiw-who .wiw-avatar{animation:wiw-pulse 1s ease-in-out infinite}
 .wiw-name{display:flex;align-items:center;gap:.3em;max-width:100%;font-size:1.05em;word-break:break-word;overflow-wrap:anywhere}
 .wiw svg{width:1em;height:1em;flex:none;fill:currentColor}
 .wiw-blank{background:var(--jf-palette-background-paper,#202020);color:var(--jf-palette-text-secondary,rgba(255,255,255,.7))}
@@ -196,7 +197,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 .wiw-nogap .wiw-actions>*,.wiw-nogap .wiw-compare>*{margin:0 .5em}
 @keyframes wiw-in{from{opacity:0;transform:scale(1.03)}}
 @keyframes wiw-pulse{50%{opacity:.5}}
-@media (prefers-reduced-motion:reduce){.wiw,.wiw-avatar,.wiw-busy .wiw-avatar,.wiw-tile{animation:none;transition:none}}
+@media (prefers-reduced-motion:reduce){.wiw,.wiw .wiw-avatar,.wiw-tile{animation:none!important;transition:none!important}}
 `;
 
     // Shown in the console so a device where the picker doesn't appear can be checked (F12, or
@@ -1506,6 +1507,8 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         dialog.querySelectorAll('button, input').forEach(el => {
             el.disabled = value;
         });
+        // While a sign-in is under way, the step says so (the profile's picture pulses too).
+        authPanel.querySelector('[type=submit]').textContent = value ? TEXT.signingIn : TEXT.signIn;
     }
 
     function setError(message) {
