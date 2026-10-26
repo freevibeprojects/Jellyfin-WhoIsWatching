@@ -150,6 +150,11 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 .wiw-for .wiw-profile{width:calc(5 * var(--u));font-size:.9em}
 .wiw-for .wiw-initial{font-size:calc(2 * var(--u))}
 .wiw-for .wiw-name{max-width:none;white-space:nowrap}
+.wiw-crowded .wiw-grid{gap:calc(1.5 * var(--u))}
+.wiw-crowded .wiw-grid .wiw-profile{width:calc(7 * var(--u))}
+.wiw-crowded .wiw-grid .wiw-initial{font-size:calc(2.75 * var(--u))}
+.wiw-crowded .wiw-pick{max-width:none}
+.wiw-crowded .wiw-grid .wiw-name{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 /* Jellyfin's TV layout reads from the sofa: its text is a quarter bigger (20px at 1080p), and so is the picker. */
 .layout-tv .wiw{--u:20px}
 .wiw-gallery{display:flex;flex-wrap:wrap;justify-content:center;gap:calc(1.25 * var(--u));margin:0;padding:0;list-style:none}
@@ -185,6 +190,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
  .wiw-brand{font-size:min(calc(var(--wiw-brand-size,40) * var(--u) / 16),10vw)}
  .wiw-grid{gap:min(calc(2 * var(--u)),4vw)}
  .wiw-profile{width:min(calc(9 * var(--u)),26vw)}
+ .wiw-crowded .wiw-grid .wiw-profile{width:min(calc(7 * var(--u)),22vw)}
  .wiw-initial{font-size:min(calc(3.5 * var(--u)),10vw)}
  .wiw-tile{width:min(calc(7 * var(--u)),20vw)}
  .wiw-compare{gap:min(calc(3 * var(--u)),6vw)}
@@ -675,6 +681,8 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         manage.hidden = !users.some(user => canEdit(api, user));
         pickPanel.querySelector('[data-action=account]').hidden = managing || !currentId;
         pickPanel.querySelector('.wiw-other').hidden = Boolean(currentId);
+        // A big household: smaller tiles, so everyone and the buttons below fit on one screen.
+        dialog.classList.toggle('wiw-crowded', users.length + 1 > 10);
     }
 
     // The administrator's brand text (plugin settings), in a corner like Netflix's logo.
