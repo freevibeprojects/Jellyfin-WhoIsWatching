@@ -45,6 +45,7 @@
         signingInAs: 'Signing in as',
         back: 'Back',
         passwordHint: 'Leave empty if this profile has no password.',
+        accountPasswordHint: 'Leave empty if this account has no password.',
         remember: 'Remember on this device',
         rememberHint: 'Anyone using this device can then open this profile without the password, until someone signs out.',
         otherSignIn: 'Other ways to sign in',
@@ -1035,6 +1036,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         name.setAttribute('role', 'heading');
         name.setAttribute('aria-level', '1');
         authPanel.querySelector('.wiw-account').hidden = Boolean(user);
+        authPanel.querySelector('#wiw-hint').textContent = user ? TEXT.passwordHint : TEXT.accountPasswordHint;
         authPanel.querySelector('.wiw-username').value = user ? user.Name : '';
         authPanel.querySelector('.wiw-check').hidden = !user || !canRemember(api) || isAdmin(user);
         authPanel.querySelector('.wiw-remember').checked = Boolean(token);
