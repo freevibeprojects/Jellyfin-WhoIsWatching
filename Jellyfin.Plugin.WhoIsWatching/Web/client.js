@@ -845,6 +845,8 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             replaced = false;
             if (!trigger) {
                 focusSignInPage();
+            } else if (!dialog.showModal && trigger.isConnected) {
+                trigger.focus(); // what a real <dialog> does by itself
             }
         });
 
@@ -1580,6 +1582,20 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     function onKeyDown(e) {
         // Keep Jellyfin's global shortcuts and TV navigation from acting behind the dialog.
         e.stopPropagation();
+
+        // Tab past the last control wraps to the first (and Shift+Tab the other way), instead of leaving
+        // for the page body or the browser's own controls, which a <dialog> allows and the <div> stand-in can't stop.
+        if (e.key === 'Tab') {
+            const controls = Array.from(dialog.querySelectorAll('button, input'))
+                .filter(el => !el.disabled && el.getClientRects().length);
+            const edge = e.shiftKey ? controls[0] : controls[controls.length - 1];
+            if (controls.length && document.activeElement === edge) {
+                e.preventDefault();
+                (e.shiftKey ? controls[controls.length - 1] : controls[0]).focus();
+            }
+
+            return;
+        }
 
         // Escape and TV remotes' back key (webOS sends 461) go back a step, then close. Escape is
         // handled here rather than through the dialog's cancel event: Chrome lets a page cancel that

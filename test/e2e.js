@@ -102,8 +102,13 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.keyboard.press('ArrowDown');
   ok(await page.evaluate(() => document.activeElement.dataset.action) === 'manage', 'ArrowDown from any profile goes to Manage profiles, not the gear');
   ok(await page.$eval('[data-action=account]', b => b.title === 'Account settings' && !b.hasAttribute('aria-label') && !!b.querySelector('svg')), 'Account settings is a gear icon');
+  // Tab never leaves the picker (the old engines' stand-in has no modal focus loop of its own)
+  await page.focus('.wiw [data-action=account]');
+  await page.keyboard.press('Tab');
+  ok(await page.evaluate(() => document.querySelector('.wiw').contains(document.activeElement)), 'Tab past the last control stays in the picker');
   await page.keyboard.press('Escape');
   ok(!(await page.$('.wiw[open]')), 'Escape closes');
+  ok(await page.evaluate(() => Boolean(document.activeElement.closest('.headerUserButton, [aria-controls="app-user-menu"]'))), 'Escape gives focus back to the avatar');
   // keyboards and TV remotes move focus to the avatar before pressing OK: focus starts the loading
   // (closing the picker gave focus back to the avatar, which preloads nothing)
   await page.evaluate(() => document.activeElement.blur());
