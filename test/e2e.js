@@ -101,6 +101,11 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('ArrowDown');
   ok(await page.evaluate(() => document.activeElement.dataset.action) === 'manage', 'ArrowDown from any profile goes to Manage profiles, not the gear');
+  // Windows high contrast drops shadows and backgrounds: focus and tiles still show
+  await page.emulateMedia({ forcedColors: 'active' });
+  const contrast = await page.evaluate(() => ({ focus: getComputedStyle(document.activeElement).outlineStyle, tile: getComputedStyle(document.querySelector('.wiw-grid .wiw-avatar')).borderTopStyle }));
+  await page.emulateMedia({ forcedColors: 'none' });
+  ok(contrast.focus !== 'none' && contrast.tile !== 'none', 'high contrast: the focused control has an outline, the tiles a border ' + JSON.stringify(contrast));
   ok(await page.$eval('[data-action=account]', b => b.title === 'Account settings' && !b.hasAttribute('aria-label') && !!b.querySelector('svg')), 'Account settings is a gear icon');
   // Tab never leaves the picker (the old engines' stand-in has no modal focus loop of its own)
   await page.focus('.wiw [data-action=account]');

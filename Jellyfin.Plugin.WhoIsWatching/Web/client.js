@@ -201,6 +201,12 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 .wiw-nogap .wiw-actions>*,.wiw-nogap .wiw-compare>*{margin:0 .5em}
 @keyframes wiw-in{from{opacity:0;transform:scale(1.03)}}
 @keyframes wiw-pulse{50%{opacity:.5}}
+/* Windows high contrast (forced colours) drops shadows and backgrounds: outlines and borders instead. */
+@media (forced-colors:active){
+ .wiw-avatar,.wiw-tile,.wiw .wiw-button{border:1px solid ButtonText}
+ .wiw-profile[aria-current=true] .wiw-avatar{outline:2px dashed CanvasText;outline-offset:2px}
+ button.wiw-profile:focus-visible .wiw-avatar,.wiw-tile:focus-visible,.wiw .emby-checkbox:focus-visible+span+.checkboxOutline{outline:3px solid Highlight;outline-offset:2px}
+ .wiw .wiw-button:focus-visible,.wiw .paper-icon-button-light:focus-visible{outline:3px solid Highlight!important;outline-offset:2px}}
 @media (prefers-reduced-motion:reduce){.wiw,.wiw .wiw-avatar,.wiw-tile{animation:none!important;transition:none!important}}
 `;
 
