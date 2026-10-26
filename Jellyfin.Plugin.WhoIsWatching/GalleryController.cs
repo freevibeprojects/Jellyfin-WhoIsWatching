@@ -126,21 +126,23 @@ public sealed partial class GalleryController : ControllerBase
             return StatusCode(StatusCodes.Status413PayloadTooLarge);
         }
 
-        // Sized from Content-Length (Kestrel enforces it) so a typical 100 KB upload doesn't take 1 MB.
-        var data = new byte[Math.Min(Request.ContentLength ?? MaxImageBytes, MaxImageBytes) + 1];
-        var length = 0;
+        // Grows with what actually arrives: a request that only announces a large body holds no memory.
+        using var received = new MemoryStream();
+        var chunk = new byte[16 * 1024];
         int read;
-        while (length < data.Length && (read = await Request.Body.ReadAsync(data.AsMemory(length), HttpContext.RequestAborted).ConfigureAwait(false)) > 0)
+        while (received.Length <= MaxImageBytes && (read = await Request.Body.ReadAsync(chunk, HttpContext.RequestAborted).ConfigureAwait(false)) > 0)
         {
-            length += read;
+            received.Write(chunk, 0, read);
         }
 
-        if (length > MaxImageBytes)
+        if (received.Length > MaxImageBytes)
         {
             return StatusCode(StatusCodes.Status413PayloadTooLarge);
         }
 
         // Start and end markers and a plausible size: a whole JPEG, as the picker's canvas makes, not a stub.
+        var length = (int)received.Length;
+        var data = received.GetBuffer();
         var body = data.AsSpan(0, length);
         if (length < 100 || !body.StartsWith((ReadOnlySpan<byte>)[0xFF, 0xD8, 0xFF]) || !body.EndsWith((ReadOnlySpan<byte>)[0xFF, 0xD9]))
         {
