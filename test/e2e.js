@@ -209,7 +209,8 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await slow.click('.wiw-other');
   await slow.waitForSelector('#loginPage .btnManual', { state: 'visible', timeout: 30000 });
   await slow.waitForTimeout(500);
-  ok(pickerFirst && !(await slow.$('.wiw[open]')), 'the picker shows before a slow sign-in page, and closed then it stays closed');
+  const focusOnPage = await slow.waitForFunction(() => document.getElementById('loginPage').contains(document.activeElement), null, { timeout: 4000 }).then(() => true, () => false);
+  ok(pickerFirst && !(await slow.$('.wiw[open]')) && focusOnPage, 'the picker shows before a slow sign-in page; closed then, it stays closed and focus lands on Jellyfin’s page');
   await slow.context().close();
   // closed because some other page showed first (nobody declined it), it still covers the sign-in page
   const other = await (await browser.newContext()).newPage();

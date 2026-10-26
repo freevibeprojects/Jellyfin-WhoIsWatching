@@ -245,6 +245,10 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         if (e.target.id === 'loginPage') {
             openSignIn(e.target);
             if (e.type === 'viewshow') {
+                if (declined) {
+                    focusSignInPageSoon(Date.now() + 3000); // focus was left on nothing when the picker closed
+                }
+
                 declined = false; // only the showing it was declined before is left alone
             }
         } else if (e.type === 'viewshow' && isOpen() && !busy) {
@@ -294,6 +298,26 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     function onLoginPage() {
         const page = document.getElementById('loginPage');
         return Boolean(page) && !page.classList.contains('hide');
+    }
+
+    // Focus moves on to Jellyfin's sign-in page, for keyboards, remotes and screen readers: to its first
+    // control shown (Jellyfin hides its other forms). False if it has none yet.
+    function focusSignInPage() {
+        const first = onLoginPage() && Array.from(document.querySelectorAll('#loginPage button, #loginPage [tabindex="0"]'))
+            .find(el => el.getClientRects().length);
+        if (first) {
+            first.focus();
+        }
+
+        return Boolean(first);
+    }
+
+    // The same, once the page has drawn its controls, unless focus has gone somewhere by then.
+    function focusSignInPageSoon(deadline) {
+        const lost = !document.activeElement || document.activeElement === document.body;
+        if (lost && !isOpen() && !focusSignInPage() && Date.now() < deadline) {
+            setTimeout(() => focusSignInPageSoon(deadline), 100);
+        }
     }
 
     // Calls back once with Jellyfin's ApiClient, the moment Jellyfin Web sets window.ApiClient.
@@ -760,11 +784,8 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             // Closed because another page showed, nobody declined anything.
             declined = !replaced && !trigger && !onLoginPage();
             replaced = false;
-            // Closed over the sign-in page: focus moves on to Jellyfin's own, for keyboards and remotes.
-            const first = !trigger && onLoginPage() && Array.from(document.querySelectorAll('#loginPage button, #loginPage [tabindex="0"]'))
-                .find(el => el.getClientRects().length); // shown: Jellyfin hides its other forms
-            if (first) {
-                first.focus();
+            if (!trigger) {
+                focusSignInPage();
             }
         });
 
