@@ -114,8 +114,7 @@
 .wiw-initial{font-size:calc(3.5 * var(--u));font-weight:500;line-height:1}
 .wiw-avatar img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover}
 .wiw-profile[aria-current=true] .wiw-avatar{box-shadow:0 0 0 calc(.3 * var(--u)) var(--wiw-accent,#00a4dc)}
-button.wiw-profile:hover,button.wiw-profile:focus-visible{color:var(--jf-palette-text-primary,#fff)}
-button.wiw-profile:hover .wiw-avatar{transform:scale(1.04)}
+button.wiw-profile:focus-visible{color:var(--jf-palette-text-primary,#fff)}
 button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u)) var(--jf-palette-text-primary,#fff);transform:scale(1.04)}
 .wiw-busy .wiw-avatar,.wiw[aria-busy=true] .wiw-who .wiw-avatar{animation:wiw-pulse 1s ease-in-out infinite}
 .wiw-name{display:flex;align-items:center;gap:.3em;max-width:100%;font-size:1.05em;word-break:break-word;overflow-wrap:anywhere}
@@ -127,7 +126,14 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
    can equal its normal one, so keyboard and remote focus also gets a ring. */
 .wiw .wiw-button:focus-visible,.wiw .paper-icon-button-light:focus-visible,.wiw .emby-checkbox:focus-visible+span+.checkboxOutline{box-shadow:0 0 0 calc(.15 * var(--u)) var(--jf-palette-text-primary,#fff)}
 .layout-tv .wiw .emby-checkbox:focus+span+.checkboxOutline{transform:scale(1.2)}
-@media (pointer:coarse){.wiw .wiw-check .emby-checkbox-label{min-height:44px}}
+/* Hover only where there is a real pointer: on touch screens it sticks to the last tile tapped. */
+@media (hover:hover){
+ button.wiw-profile:hover{color:var(--jf-palette-text-primary,#fff)}
+ button.wiw-profile:hover .wiw-avatar{transform:scale(1.04)}
+ .wiw-tile:hover{box-shadow:0 0 0 calc(.19 * var(--u)) var(--jf-palette-text-primary,#fff);transform:scale(1.06)}
+ .wiw-add:hover{color:var(--wiw-accent,#00a4dc)}}
+/* Thumb-sized targets on touch screens. */
+@media (pointer:coarse){.wiw .wiw-check .emby-checkbox-label,.wiw .wiw-button{min-height:44px}}
 .wiw button:disabled,.wiw input:disabled{cursor:progress}
 .wiw .wiw-close{position:absolute;top:calc(.75 * var(--u));right:calc(.75 * var(--u));width:2.75em;height:2.75em;margin:0;padding:0;font-size:1.2em}
 .wiw .wiw-icon{width:2em;height:2em;margin:0;padding:0;font-size:1.6em}
@@ -151,9 +157,9 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
  background:var(--jf-palette-background-paper,#202020);color:var(--jf-palette-text-secondary,rgba(255,255,255,.7));cursor:pointer;outline:none;transition:box-shadow .15s,transform .15s}
 .wiw-tile svg{font-size:2.2em}
 .wiw-tile img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover}
-.wiw-tile:hover,.wiw-tile:focus-visible{box-shadow:0 0 0 calc(.19 * var(--u)) var(--jf-palette-text-primary,#fff);transform:scale(1.06)}
+.wiw-tile:focus-visible{box-shadow:0 0 0 calc(.19 * var(--u)) var(--jf-palette-text-primary,#fff);transform:scale(1.06)}
 .wiw-add{border:2px dashed currentColor}
-.wiw-add:hover,.wiw-add:focus-visible{color:var(--wiw-accent,#00a4dc)}
+.wiw-add:focus-visible{color:var(--wiw-accent,#00a4dc)}
 .wiw-compare{display:flex;align-items:center;gap:calc(3 * var(--u))}
 .wiw-compare figure{display:flex;flex-direction:column;align-items:center;gap:.7em;width:calc(10 * var(--u));margin:0;color:var(--jf-palette-text-secondary,rgba(255,255,255,.7))}
 .wiw-compare>svg{font-size:2em}
