@@ -228,6 +228,18 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await other.waitForSelector('#loginPage', { state: 'attached', timeout: 30000 });
   ok(closedByPage && await other.waitForSelector('.wiw[open] .wiw-grid button', { timeout: 10000 }).then(() => true, () => false), 'closed by another page showing, the picker still covers the sign-in page later');
   await other.context().close();
+  // signing in from that early picker while Jellyfin is still starting: its start-up (held until the
+  // sign-in has been answered, at most 3 s) must not save its signed-out state over the new sign-in
+  const racing = await (await browser.newContext()).newPage();
+  let answered; const signedIn = new Promise(r => { answered = r; });
+  racing.on('requestfinished', q => { if (/authenticatebyname/i.test(q.url())) answered(); });
+  await racing.route(/System\/Info\/Public/, async route => { await Promise.race([signedIn, new Promise(r => setTimeout(r, 3000))]); await route.continue(); });
+  await racing.goto(B + '/web/');
+  await racing.waitForSelector('.wiw[open] .wiw-grid button', { timeout: 30000 });
+  await racing.click('.wiw-grid button[aria-label="Kid"]');
+  await Promise.all([racing.waitForEvent('load', { timeout: 30000 }), racing.click('.wiw-auth button[type=submit]')]);
+  ok(await racing.waitForFunction(() => window.ApiClient && window.ApiClient.getCurrentUserId(), null, { timeout: 15000 }).then(() => true, () => false), 'a sign-in from the early picker survives Jellyfin finishing its start-up');
+  await racing.context().close();
   const stalled = await (await browser.newContext()).newPage();
   await stalled.route(/Users\/Public/i, () => {}); // never answers
   await stalled.goto(B + '/web/');

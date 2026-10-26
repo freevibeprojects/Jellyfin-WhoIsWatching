@@ -1180,6 +1180,12 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         const previousToken = api.accessToken();
         setBusy(true);
         setError('');
+        // Jellyfin Web, while starting, saves its signed-out state when it gets through, over any sign-in
+        // made meanwhile; from the picker shown before Jellyfin's first page, wait for that page.
+        if (!previousId) {
+            await startedUp(Date.now() + 15000);
+        }
+
         let keepPrevious;
         let result;
         // Jellyfin keeps a session across reloads only with its "Remember me" on (its default). Off, the
@@ -1237,6 +1243,14 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         history.replaceState(null, '', location.pathname + location.search + route);
         location.reload();
         return new Promise(() => {});
+    }
+
+    // Resolves once Jellyfin Web shows a page (it has finished starting), or at the deadline.
+    function startedUp(deadline) {
+        return new Promise(resolve => {
+            const check = () => (document.querySelector('.mainAnimatedPage') || Date.now() > deadline ? resolve() : setTimeout(check, 50));
+            check();
+        });
     }
 
     // Sets Jellyfin's "Remember me" (null: unset) and returns what it was.
