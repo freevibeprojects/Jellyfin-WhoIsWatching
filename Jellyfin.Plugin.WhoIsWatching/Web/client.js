@@ -58,6 +58,7 @@
         noPictures: 'No pictures yet.',
         addElsewhere: 'Pictures are added from a phone or computer.',
         confirmPicture: 'Change profile picture?',
+        added: 'Added to the shared gallery.',
         currentPicture: 'Current',
         newPicture: 'New',
         notYet: 'Not yet',
@@ -766,6 +767,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 </section>
 <section class="wiw-panel wiw-confirm" hidden>
  <h1 class="wiw-title" id="wiw-title-confirm">${TEXT.confirmPicture}</h1>
+ <p class="wiw-hint wiw-added" role="status" hidden>${TEXT.added}</p>
  <div class="wiw-compare"><figure class="wiw-old"></figure>${icon(ICON_ARROW)}<figure class="wiw-new"></figure></div>
  <p class="wiw-error" role="alert"></p>
  <div class="wiw-actions">
@@ -1474,12 +1476,14 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     }
 
     // Netflix's "Change profile icon?" step: current picture, arrow, new picture.
-    function choose(api, id) {
+    // added: the picture was just uploaded, and is in the gallery whatever is chosen next.
+    function choose(api, id, added) {
         if (busy) {
             return;
         }
 
         chosen = id;
+        confirmPanel.querySelector('.wiw-added').hidden = !added;
         const picture = document.createElement('span');
         picture.className = 'wiw-avatar cardImageContainer';
         picture.append(galleryImage(api, id));
@@ -1556,7 +1560,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         await loadGallery(api);
         setBusy(false);
         if (id) {
-            choose(api, id);
+            choose(api, id, true);
         } else {
             picturesPanel.querySelector('.wiw-add').focus();
         }
