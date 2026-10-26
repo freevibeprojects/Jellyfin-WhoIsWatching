@@ -7,6 +7,8 @@
 //     onAuthenticated (remembered profiles), logout (wrapped to forget them), uploadUserImage;
 //     window.ApiClient's first assignment is watched (the sign-in page's profiles are requested then)
 //   - localStorage: jellyfin_credentials (whether a sign-in is saved) and enableAutoLogin (Remember me)
+//   - before any page shows: .mainAnimatedPage (Jellyfin's pages), a stylesheet under /themes/ and
+//     --jf-palette-background-default (the theme is in); without them the picker waits for the page
 //   - GET /Users/Public (the login screen's user list), GET /Users/Me, POST /Sessions/Logout
 //   - AVATAR_SELECTOR below, and the theme's .button-submit colour (accent)
 //   - this plugin's GET /WhoIsWatching/Settings (brand text) and /WhoIsWatching/Images (the shared
@@ -216,6 +218,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     let busy = false;
     let bypass = false;
     let closing = false;
+    let declined = false; // the sign-in picker was closed before Jellyfin's sign-in page showed
 
     let preload; // { api, at, data }: profiles requested when the avatar was pressed, for the click that follows
     let early; // { api, at, data }: the sign-in page's data, requested before the page shows (see prefetch)
@@ -240,6 +243,9 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     const onView = e => {
         if (e.target.id === 'loginPage') {
             openSignIn(e.target);
+            if (e.type === 'viewshow') {
+                declined = false; // only the showing it was declined before is left alone
+            }
         } else if (e.type === 'viewshow' && isOpen() && !busy) {
             closeDialog();
         }
@@ -254,6 +260,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         watchSignOut(api);
         if (hasApi(api) && !api.getCurrentUserId() && !savedSignIn()) {
             prefetch(api);
+            early.data.then(() => openBeforePage(Date.now() + 10000), () => {});
         }
     });
     if (onLoginPage()) {
@@ -323,6 +330,27 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         }
     }
 
+    // Signed out, the picker can show as soon as the profiles and Jellyfin's theme are in, before
+    // Jellyfin has finished starting and shown its sign-in page, which then arrives underneath.
+    // If any page shows first, the sign-in page brings the picker itself (or another page wins).
+    function openBeforePage(deadline) {
+        if (document.querySelector('.mainAnimatedPage') || isOpen() || Date.now() > deadline) {
+            return;
+        }
+
+        if (themeReady()) {
+            openSignIn(null);
+        } else {
+            setTimeout(() => openBeforePage(deadline), 50);
+        }
+    }
+
+    // Jellyfin's theme is in: its sheet has loaded and its colour variables are set.
+    function themeReady() {
+        return Array.from(document.styleSheets).some(sheet => /\/themes\//.test(sheet.href || ''))
+            && Boolean(themeVariable('--jf-palette-background-default'));
+    }
+
     // Requests the sign-in page's data ahead, and puts the profile pictures in the browser's cache.
     function prefetch(api) {
         const data = signInData(api);
@@ -336,19 +364,23 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 
     // Signed out: the same picker, without "you", settings or Manage profiles. Jellyfin's page stays
     // underneath (Other ways to sign in) for manual sign-in, Quick Connect and "Forgot password".
+    // page null: before Jellyfin shows any page (see openBeforePage).
     async function openSignIn(page) {
         const api = window.ApiClient;
-        if (!hasApi(api) || api.getCurrentUserId() || opening || isOpen()) {
+        if (!hasApi(api) || api.getCurrentUserId() || opening || isOpen() || declined) {
             return;
         }
 
         opening = true;
         // Jellyfin's page stays hidden until the picker covers it (or won't), so it doesn't flash first;
         // at most 3 s, in case the server is slow to answer.
-        page.style.visibility = 'hidden';
+        if (page) {
+            page.style.visibility = 'hidden';
+        }
+
         // Shown by then, the page may already be in use, so the picker stays away.
         let revealed = false;
-        const reveal = setTimeout(() => {
+        const reveal = page && setTimeout(() => {
             revealed = true;
             page.style.visibility = '';
         }, 3000);
@@ -368,7 +400,8 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 
         try {
             // Nobody listed (every user hidden from login screens): Jellyfin's page as it is.
-            if (users.length && !revealed && onLoginPage() && !isOpen() && !api.getCurrentUserId()) {
+            const stillDue = page ? onLoginPage() : !document.querySelector('.mainAnimatedPage');
+            if (users.length && !revealed && stillDue && !isOpen() && !api.getCurrentUserId()) {
                 trigger = null;
                 open(api, users, settings);
                 // Jellyfin's Login Disclaimer (house rules, legal notices) stays in sight, as plain text.
@@ -382,8 +415,10 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             console.warn('[WhoIsWatching] could not show profiles', err);
             closeDialog();
         } finally {
-            clearTimeout(reveal);
-            page.style.visibility = '';
+            if (page) {
+                clearTimeout(reveal);
+                page.style.visibility = '';
+            }
         }
     }
 
@@ -719,6 +754,8 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         dialog.addEventListener('close', () => {
             authPanel.querySelector('.wiw-input').value = '';
             pending = null;
+            // Declined before Jellyfin's sign-in page had even shown: it isn't covered when it arrives.
+            declined = !trigger && !onLoginPage();
             // Closed over the sign-in page: focus moves on to Jellyfin's own, for keyboards and remotes.
             const first = !trigger && onLoginPage() && Array.from(document.querySelectorAll('#loginPage button, #loginPage [tabindex="0"]'))
                 .find(el => el.getClientRects().length); // shown: Jellyfin hides its other forms
@@ -1123,8 +1160,10 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         // Full reload, without the old route: nothing the previous profile loaded (cached queries,
         // views, player state) survives into the new one. From the sign-in page, go where it was
         // taking the user (its url parameter, a route inside Jellyfin Web), as Jellyfin's page does.
-        // A change of hash alone wouldn't reload, so set the address first, then reload it.
-        const next = !previousId && new URLSearchParams(location.hash.split('?')[1] || '').get('url');
+        // A change of hash alone wouldn't reload, so set the address first, then reload it. Picked
+        // before Jellyfin got to its sign-in page, the address is still the route that was asked for.
+        const hash = location.hash.slice(1);
+        const next = !previousId && (/^\/login/.test(hash) ? new URLSearchParams(hash.split('?')[1] || '').get('url') : hash);
         const route = next && /^\/(?!\/|login)/.test(next) ? '#' + next : ''; // a route like /details?id=…
         history.replaceState(null, '', location.pathname + location.search + route);
         location.reload();

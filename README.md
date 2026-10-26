@@ -35,7 +35,7 @@ Signed out (a first visit, or after signing out), the picker covers Jellyfin's s
 
 **Other account**, the last tile, signs in to an account the list doesn't show (one hidden from the sign-in screen, such as the administrator's) by asking for its name and password. It is there on the avatar's picker too, so switching to a hidden account doesn't need signing out first.
 
-The picker is ready when the page is. The profiles, the brand text and the profile pictures are requested while Jellyfin Web is still starting (it makes several more round trips before it shows its sign-in page) and when you sign out, and the picker shows without fading in. Jellyfin applies the server's Custom CSS only once its sign-in page shows, so the picker picks up the page background when that arrives.
+The picker doesn't wait for the page. The profiles, the brand text and the profile pictures are requested while Jellyfin Web is still starting (it makes several more round trips before it shows its sign-in page) and when you sign out. The picker shows, without fading in, as soon as they and Jellyfin's theme are in, usually before Jellyfin's own sign-in page has finished loading; that page then arrives underneath. Closing the picker that early leaves Jellyfin's page alone when it comes. Jellyfin applies the server's Custom CSS only once its sign-in page shows, so the picker picks up the page background when that arrives.
 
 ### Password behaviour
 
@@ -120,7 +120,7 @@ Jellyfin has no official extension point for the main web UI, so the plugin reli
 | `/Users/Public`, `/Users/AuthenticateByName`, `/Sessions/Logout` | Public REST API |
 | `window.ApiClient` and its methods | Undocumented global, but jellyfin-web keeps it for plugins and uses it in its own code. `client.js` checks each method before taking over the click. Optional extras are checked too: `onAuthenticated` (Remember on this device), `logout` (wrapped so signing out forgets remembered profiles), `uploadUserImage` (Manage profiles). Its first assignment is watched, to request the sign-in page's profiles early. |
 | `.button-submit` colour | Read at runtime for the accent; falls back to the theme variable and then Jellyfin blue |
-| The sign-in page: `#loginPage`, its `viewbeforeshow`/`viewshow` events, `GET /Branding/Configuration` | Internal markup and events; without them the sign-in page is Jellyfin's own, and the avatar still works |
+| The sign-in page: `#loginPage`, its `viewbeforeshow`/`viewshow` events, `GET /Branding/Configuration`; before it shows, `.mainAnimatedPage`, a stylesheet under `/themes/` and `--jf-palette-background-default` | Internal markup and events; without them the sign-in page is Jellyfin's own, and the avatar still works |
 | Jellyfin's classes `emby-button`, `raised`, `button-submit`, `emby-input`, `emby-checkbox`, `paper-icon-button-light`, `cardImageContainer`, `defaultCardBackground1-5`, and `--jf-card-borderRadius` | Used for the look only; if renamed, the controls fall back to the browser's plain style |
 | `localStorage.enableAutoLogin`, `localStorage.jellyfin_credentials` | Jellyfin Web's *Remember me* setting (see *Password behaviour*), and its saved sign-ins, only read: with one saved, the sign-in page's profiles aren't requested early. Without them, the sign-in page waits for its profiles, as in 1.4.1. |
 | Avatar selectors `.headerUserButton`, `[aria-controls="app-user-menu"]` | Internal markup, **the most likely thing to break**. One constant at the top of `client.js`. |

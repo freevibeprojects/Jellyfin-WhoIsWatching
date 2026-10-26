@@ -31,6 +31,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   const profilesAhead = since => page.evaluate(t => performance.getEntriesByType('resource').some(e => /\/Users\/Public$/.test(e.name) && e.startTime > t && e.startTime < window.loginShownAt), since);
   await page.goto(B + '/web/');
   await page.waitForSelector('.wiw[open] .wiw-grid button', { timeout: 30000 });
+  await page.waitForFunction(() => window.loginShownAt, null, { timeout: 30000 }); // the picker can come first
   const instant = { ahead: await profilesAhead(0), noFade: await page.$eval('.wiw', d => getComputedStyle(d).animationName === 'none') };
   ok(instant.ahead && instant.noFade, 'the sign-in picker is ready with the page: profiles requested ahead, no fade-in ' + JSON.stringify(instant));
   const signedOut = await page.evaluate(() => ({
@@ -42,6 +43,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   }));
   ok(signedOut.names === 'Alice,Bob,Kid,Other account' && signedOut.noSettings && signedOut.other && signedOut.brand && signedOut.page.includes('login'), 'signed out, the picker covers the sign-in page: ' + JSON.stringify(signedOut));
   await page.waitForTimeout(400); await page.screenshot({ path: out + '/' + (layout || 'default') + '-0-signin.png' });
+  await page.waitForSelector('#loginPage .btnManual', { state: 'visible', timeout: 30000 }); // the picker may come first
   await page.click('.wiw-other');
   ok(!(await page.$('.wiw[open]')) && await page.isVisible('#loginPage .btnManual') && await page.waitForFunction(() => document.getElementById('loginPage').contains(document.activeElement), null, { timeout: 3000 }).then(() => true, () => false), 'Other ways to sign in shows Jellyfin’s sign-in page, focus on it');
   await page.reload();
@@ -197,6 +199,18 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   };
   const radius = p => p.$eval('.wiw-grid .wiw-avatar', a => getComputedStyle(a).borderTopLeftRadius);
   // a server slow to list profiles: Jellyfin's sign-in page isn't kept hidden for long
+  // the picker comes up before a slow sign-in page (Jellyfin's page code held back 2 s), and closed
+  // then, it leaves Jellyfin's page alone when that arrives
+  const slow = await (await browser.newContext()).newPage();
+  await slow.route(/session-login.[0-9a-f]+.chunk.js/, async route => { await new Promise(r => setTimeout(r, 2000)); await route.continue(); });
+  await slow.goto(B + '/web/');
+  await slow.waitForSelector('.wiw[open] .wiw-grid button', { timeout: 30000 });
+  const pickerFirst = !(await slow.$('#loginPage'));
+  await slow.click('.wiw-other');
+  await slow.waitForSelector('#loginPage .btnManual', { state: 'visible', timeout: 30000 });
+  await slow.waitForTimeout(500);
+  ok(pickerFirst && !(await slow.$('.wiw[open]')), 'the picker shows before a slow sign-in page, and closed then it stays closed');
+  await slow.context().close();
   const stalled = await (await browser.newContext()).newPage();
   await stalled.route(/Users\/Public/i, () => {}); // never answers
   await stalled.goto(B + '/web/');
