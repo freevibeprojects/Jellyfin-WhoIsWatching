@@ -442,6 +442,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.screenshot({ path: out + '/' + (layout || 'default') + '-7-1440p.png' });
   ok(Math.abs(sizes[1].tile / sizes[0].tile - 4 / 3) < 0.02 && Math.abs(sizes[2].tile / sizes[0].tile - 2) < 0.02 && sizes.every(x => x.fits),
     'picker scales with the screen: ' + sizes.map(x => Math.round(x.tile) + (x.fits ? '' : ' (overflows)')).join(' / ') + 'px');
+  ok(layout !== 'tv' || Math.abs(sizes[0].tile - 180) < 2, 'TV layout: the picker is a quarter bigger at 1080p, like Jellyfin’s TV text: ' + Math.round(sizes[0].tile) + 'px');
   ok(JSON.stringify(bad) === '["401 POST /Users/authenticatebyname","401 GET /Users/Me"]', 'only HTTP errors are the wrong password and the ended session: ' + bad.join(', '));
   ok(errors.length === 0, 'no page errors: ' + errors.join(' | '));
   ok(notes.some(n => /^\[WhoIsWatching\] \d+(\.\d+){3} loaded$/.test(n)), 'console says which version loaded: ' + notes[0]);

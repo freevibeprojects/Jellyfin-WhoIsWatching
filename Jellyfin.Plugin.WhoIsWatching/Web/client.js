@@ -138,6 +138,9 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 .wiw-profile[aria-disabled=true]{opacity:.35;cursor:default}
 .wiw-for .wiw-profile{width:calc(5 * var(--u));font-size:.9em}
 .wiw-for .wiw-initial{font-size:calc(2 * var(--u))}
+.wiw-for .wiw-name{max-width:none;white-space:nowrap}
+/* Jellyfin's TV layout reads from the sofa: its text is a quarter bigger (20px at 1080p), and so is the picker. */
+.layout-tv .wiw{--u:20px}
 .wiw-gallery{display:flex;flex-wrap:wrap;justify-content:center;gap:calc(1.25 * var(--u));margin:0;padding:0;list-style:none}
 .wiw-tile{position:relative;display:grid;place-items:center;width:calc(7 * var(--u));aspect-ratio:1;padding:0;border:0;overflow:hidden;
  background:var(--jf-palette-background-paper,#202020);color:var(--jf-palette-text-secondary,rgba(255,255,255,.7));cursor:pointer;outline:none;transition:box-shadow .15s,transform .15s}
@@ -162,6 +165,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 @supports (width:clamp(1px,min(1vw,1vh),2px)){
  .wiw{--u:clamp(15px,min(.8333vw,1.4815vh),64px);
   padding:max(var(--u),env(safe-area-inset-top)) max(var(--u),env(safe-area-inset-right)) max(var(--u),env(safe-area-inset-bottom)) max(var(--u),env(safe-area-inset-left))}
+ .layout-tv .wiw{--u:clamp(15px,min(1.0417vw,1.8519vh),80px)}
  .wiw-branded{padding-top:calc(max(var(--u),env(safe-area-inset-top)) + var(--u) + var(--wiw-brand-size,40) * var(--u) / 16)}
  .wiw .wiw-close{top:max(calc(.75 * var(--u)),env(safe-area-inset-top));right:max(calc(.75 * var(--u)),env(safe-area-inset-right))}
  .wiw-brand{top:max(var(--u),env(safe-area-inset-top));left:max(calc(1.5 * var(--u)),env(safe-area-inset-left))}
