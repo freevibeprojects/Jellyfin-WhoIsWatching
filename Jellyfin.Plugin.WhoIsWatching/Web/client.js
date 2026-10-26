@@ -215,20 +215,24 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     let opening = false;
     let busy = false;
     let bypass = false;
+    let closing = false;
 
     let preload; // { api, at, data }: profiles requested when the avatar was pressed, for the click that follows
     let early; // { api, at, data }: the sign-in page's data, requested before the page shows (see prefetch)
 
     window.addEventListener('click', onAvatarClick, true);
     // Pressing the avatar starts loading, so the picker can open as the click lands (a press lasts
-    // ~100 ms; on a phone over a slow link the request is the wait).
-    window.addEventListener('pointerdown', e => {
+    // ~100 ms; on a phone over a slow link the request is the wait). Keyboards and TV remotes don't
+    // press: they move focus to the avatar first, so focus starts loading too.
+    const startPreload = e => {
         const api = window.ApiClient;
-        if (avatarTarget(e) && usable(api)) {
+        if (avatarTarget(e) && usable(api) && !closing && !fresh(preload, api)) {
             preload = { api, at: Date.now(), data: load(api) };
             preload.data.catch(() => {});
         }
-    }, true);
+    };
+    window.addEventListener('pointerdown', startPreload, true);
+    window.addEventListener('focusin', startPreload, true);
 
     // Jellyfin's sign-in page (every page Jellyfin shows fires viewbeforeshow and viewshow; they don't
     // always bubble, so they are caught on the way down), including one shown before this script ran.
@@ -254,6 +258,11 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     });
     if (onLoginPage()) {
         openSignIn(document.getElementById('loginPage'));
+    }
+
+    // Profiles loaded for the avatar within the last 10 s (focus can come a while before the OK press).
+    function fresh(loaded, api) {
+        return Boolean(loaded) && loaded.api === api && Date.now() - loaded.at < 10000;
     }
 
     function avatarTarget(e) {
@@ -439,8 +448,8 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 
         trigger = button;
         opening = true;
-        // A press's preload is used only by its own click, never by a later one with older data.
-        const pressed = preload && preload.api === api && Date.now() - preload.at < 2000 ? preload.data : null;
+        // A preload is used by one click at most, and only while fresh.
+        const pressed = fresh(preload, api) ? preload.data : null;
         preload = null;
         let users = [];
         let settings = null;
@@ -741,11 +750,17 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     }
 
     function closeDialog() {
-        if (dialog.close) {
-            dialog.close();
-        } else if (isOpen()) {
-            dialog.removeAttribute('open');
-            dialog.dispatchEvent(new Event('close'));
+        // Closing gives focus back to the avatar: that isn't someone heading for it, so nothing preloads.
+        closing = true;
+        try {
+            if (dialog.close) {
+                dialog.close();
+            } else if (isOpen()) {
+                dialog.removeAttribute('open');
+                dialog.dispatchEvent(new Event('close'));
+            }
+        } finally {
+            closing = false;
         }
     }
 

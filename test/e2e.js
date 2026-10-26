@@ -95,6 +95,16 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   ok(await page.$eval('[data-action=account]', b => b.getAttribute('aria-label') === 'Account settings' && !!b.querySelector('svg')), 'Account settings is a gear icon');
   await page.keyboard.press('Escape');
   ok(!(await page.$('.wiw[open]')), 'Escape closes');
+  // keyboards and TV remotes move focus to the avatar before pressing OK: focus starts the loading
+  // (closing the picker gave focus back to the avatar, which preloads nothing)
+  await page.evaluate(() => document.activeElement.blur());
+  await avatar.focus();
+  await page.waitForTimeout(300);
+  const focusLoads = profileLoads;
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('.wiw[open]');
+  ok(profileLoads === focusLoads && focusLoads > 1, `keyboard: focus on the avatar preloads the profiles, none requested on OK (${focusLoads} before, ${profileLoads} after)`);
+  await page.keyboard.press('Escape');
 
   // brand text from the plugin settings: by default "Jellyfin" in Jellyfin's purple, top left
   await avatar.click();
