@@ -34,6 +34,11 @@ public sealed partial class GalleryController : ControllerBase
     private const int MaxImages = 200;
     private const int MaxImagesPerUser = 20; // administrators: only the gallery's cap
 
+    // The picker sends at most 512 × 512. A small file can declare a huge picture that every viewer's
+    // browser would have to decode (gigabytes of memory for a 1 MB "decompression bomb"), so the
+    // declared size is checked too.
+    private const int MaxImageSide = 1024;
+
     // Counting and adding happen under one lock, so parallel uploads can't overshoot the caps.
     private static readonly SemaphoreSlim AddLock = new(1, 1);
 
@@ -142,6 +147,11 @@ public sealed partial class GalleryController : ControllerBase
             return BadRequest("Not a JPEG image.");
         }
 
+        if (JpegSize(body) is not (> 0 and <= MaxImageSide, > 0 and <= MaxImageSide))
+        {
+            return BadRequest($"Not a JPEG image of at most {MaxImageSide} × {MaxImageSide} pixels.");
+        }
+
         await AddLock.WaitAsync(HttpContext.RequestAborted).ConfigureAwait(false);
         try
         {
@@ -213,6 +223,37 @@ public sealed partial class GalleryController : ControllerBase
         => Directory.Exists(_folder)
             ? Directory.EnumerateFiles(_folder, "*.jpg", SearchOption.AllDirectories).Where(path => Guid.TryParseExact(Path.GetFileNameWithoutExtension(path), "N", out _))
             : [];
+
+    // A JPEG's declared width and height, from the first frame header (SOFn) before the image data,
+    // or null if there is none. Segments are skipped whole, so a thumbnail inside EXIF isn't read.
+    private static (int Width, int Height)? JpegSize(ReadOnlySpan<byte> jpeg)
+    {
+        var i = 2; // after the start-of-image marker
+        while (i + 9 <= jpeg.Length && jpeg[i] == 0xFF)
+        {
+            var marker = jpeg[i + 1];
+            if (marker == 0xFF)
+            {
+                i++; // fill byte
+                continue;
+            }
+
+            if (marker is >= 0xC0 and <= 0xCF and not 0xC4 and not 0xC8 and not 0xCC)
+            {
+                return ((jpeg[i + 7] << 8) | jpeg[i + 8], (jpeg[i + 5] << 8) | jpeg[i + 6]);
+            }
+
+            var segment = (jpeg[i + 2] << 8) | jpeg[i + 3];
+            if (marker == 0xDA || segment < 2)
+            {
+                return null; // image data before any frame header, or a broken segment
+            }
+
+            i += 2 + segment;
+        }
+
+        return null;
+    }
 
     private Guid? CallerId()
         => Guid.TryParse(User.FindFirst("Jellyfin-UserId")?.Value, out var userId) ? userId : null;

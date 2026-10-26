@@ -323,7 +323,9 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   // gallery API: sign-in to list, images only, 1 MB cap, admins delete, adding needs "manage own preferences"
   const bobApi = await signIn('Bob', 'bobpw', 'e2e-bob');
   const post = (token, body) => fetch(B + '/WhoIsWatching/Images', { method: 'POST', headers: { ...auth(token), 'Content-Type': 'image/jpeg' }, body });
-  const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(100), Buffer.from([0xff, 0xd9])]);
+  // a JPEG's frame: start of image, a frame header (SOF0) declaring its size, then data and the end marker
+  const jpegOf = (w, h) => Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xc0, 0, 17, 8, h >> 8, h & 255, w >> 8, w & 255, 3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]), Buffer.alloc(100), Buffer.from([0xff, 0xd9])]);
+  const jpeg = jpegOf(512, 512);
   const added = await post(bobApi, jpeg);
   const addedId = added.ok ? (await added.json()).Id : '';
   const served = await fetch(B + '/WhoIsWatching/Images/' + addedId);
@@ -335,6 +337,8 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
     notAnImage: (await post(bobApi, Buffer.from('<svg onload=alert(1)>'))).status === 400,
     stub: (await post(bobApi, Buffer.from([0xff, 0xd8, 0xff, 0xd9]))).status === 400,
     notWholeJpeg:(await post(bobApi, Buffer.from('ÿØÿà<html>', 'latin1'))).status === 400,
+    noFrameHeader: (await post(bobApi, Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(100), Buffer.from([0xff, 0xd9])]))).status === 400,
+    decompressionBomb: (await post(bobApi, jpegOf(16000, 16000))).status === 400 && (await post(bobApi, jpegOf(512, 1025))).status === 400,
     pngRefused: (await post(bobApi, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0]))).status === 400,
     tooBig: (await post(bobApi, Buffer.alloc(1024 * 1024 + 1, 0xff))).status === 413,
     added: added.status === 200,
