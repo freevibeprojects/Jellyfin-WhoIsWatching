@@ -35,7 +35,7 @@ Signed out (a first visit, or after signing out), the picker covers Jellyfin's s
 
 **Other account**, the last tile, signs in to an account the list doesn't show (one hidden from the sign-in screen, such as the administrator's) by asking for its name and password. It is there on the avatar's picker too, so switching to a hidden account doesn't need signing out first.
 
-The picker doesn't wait for the page. The profiles, the brand text and the profile pictures are requested while Jellyfin Web is still starting (it makes several more round trips before it shows its sign-in page) and when you sign out. The picker shows, without fading in, as soon as they and Jellyfin's theme are in, usually before Jellyfin's own sign-in page has finished loading; that page then arrives underneath. Closing the picker that early leaves Jellyfin's page alone when it comes. Jellyfin applies the server's Custom CSS only once its sign-in page shows, so the picker picks up the page background when that arrives.
+The picker doesn't wait for the page. The profiles, the brand text and the profile pictures are requested while Jellyfin Web is still starting (it makes several more round trips before it shows its sign-in page) and when you sign out. The picker shows, without fading in, as soon as they and Jellyfin's theme are in, usually before Jellyfin's own sign-in page has finished loading; that page then arrives underneath. Closing the picker that early leaves Jellyfin's page alone when it comes. Jellyfin applies the server's Custom CSS only once its sign-in page shows, so until then the picker applies a copy of it itself (from the branding it has already loaded), and doesn't start in the default colours.
 
 ### Password behaviour
 

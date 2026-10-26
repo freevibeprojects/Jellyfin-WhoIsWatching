@@ -429,6 +429,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             const stillDue = page ? onLoginPage() : !document.querySelector('.mainAnimatedPage');
             if (users.length && !revealed && stillDue && !isOpen() && !api.getCurrentUserId()) {
                 trigger = null;
+                applyEarlyCustomCss(branding && branding.CustomCss);
                 open(api, users, settings);
                 // Jellyfin's Login Disclaimer (house rules, legal notices) stays in sight, as plain text.
                 const disclaimer = pickPanel.querySelector('.wiw-disclaimer');
@@ -464,11 +465,34 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             }
 
             if (restyled) {
+                dropEarlyCustomCss();
                 followTheme();
             }
         });
         observer.observe(document.documentElement, { childList: true, characterData: true, subtree: true });
         dialog.addEventListener('close', () => observer.disconnect(), { once: true });
+    }
+
+    // Jellyfin applies the server's Custom CSS only once its sign-in page shows, so a picker shown first
+    // would start in the default colours and then change. The picker applies a copy from the branding
+    // it already has, until Jellyfin's own arrives.
+    function applyEarlyCustomCss(css) {
+        if (!css || Array.from(document.querySelectorAll('style'), style => style.textContent).some(text => text.includes(css))) {
+            return;
+        }
+
+        const style = document.createElement('style');
+        style.className = 'wiw-custom-css';
+        style.textContent = css;
+        document.body.append(style); // after the theme's styles in <head>, as Jellyfin places its own copy
+
+    }
+
+    function dropEarlyCustomCss() {
+        const copy = document.querySelector('style.wiw-custom-css');
+        if (copy && Array.from(document.querySelectorAll('style')).some(style => style !== copy && style.textContent.includes(copy.textContent))) {
+            copy.remove();
+        }
     }
 
     // The profiles and the brand settings, in parallel.

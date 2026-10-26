@@ -236,6 +236,15 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   const square = await radius(themedPage);
   await themedPage.context().close();
   themedPage = await customCss('.cardImageContainer{border-radius:9px}.button-submit{background:rgb(255, 0, 128)}.emby-input{border-radius:5px}body,.backgroundContainer{background-image:linear-gradient(rgb(1, 2, 3),rgb(4, 5, 6))}');
+  // that Custom CSS is there from the start, also when the picker comes before Jellyfin's page
+  const earlyThemed = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+  await earlyThemed.route(/session-login.[0-9a-f]+.chunk.js/, async route => { await new Promise(r => setTimeout(r, 2000)); await route.continue(); });
+  await earlyThemed.goto(B + '/web/');
+  await earlyThemed.waitForSelector('.wiw[open] .wiw-grid button', { timeout: 30000 });
+  ok(!(await earlyThemed.$('#loginPage')) && await earlyThemed.$eval('.wiw', d => getComputedStyle(d).backgroundImage.includes('rgb(1, 2, 3)')), 'before Jellyfin’s page arrives, the picker already wears the Custom CSS');
+  await earlyThemed.waitForSelector('#loginPage', { state: 'attached', timeout: 30000 });
+  ok(await earlyThemed.waitForFunction(() => !document.querySelector('style.wiw-custom-css'), null, { timeout: 10000 }).then(() => true, () => false), 'the picker’s early copy of the Custom CSS goes once Jellyfin applies its own');
+  await earlyThemed.context().close();
   const custom = await radius(themedPage);
   // the page's own background (Custom CSS or a theme image) and Jellyfin's Login Disclaimer carry over
   ok(await themedPage.$eval('.wiw', d => getComputedStyle(d).backgroundImage.includes('rgb(1, 2, 3)')) && await themedPage.textContent('.wiw-disclaimer') === 'House rules: no spoilers.', 'the sign-in picker shows the page background and the Login Disclaimer');
