@@ -1553,10 +1553,14 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             const horizontal = key === 'ArrowLeft' || key === 'ArrowRight';
             const along = { ArrowLeft: -dx, ArrowRight: dx, ArrowUp: -dy, ArrowDown: dy }[key];
             const across = Math.abs(horizontal ? dy : dx);
-            const score = along + across * 2;
+            // The small gear only from beside it (Down from a profile means Manage profiles), unless
+            // nothing else is below.
+            const score = along + across * 2 + (!horizontal && el.classList.contains('wiw-icon') ? 1e6 : 0);
             // The corner X only by going up, so a stray Left/Right can't close the picker mid-task.
             const corner = horizontal && el.classList.contains('wiw-close');
-            if (el !== from && !corner && along > 1 && score < bestScore) {
+            // Left/Right stay on the row: they never jump up or down to another one.
+            const otherRow = horizontal && Math.abs(dy) >= (a.height + b.height) / 2;
+            if (el !== from && !corner && !otherRow && along > 1 && score < bestScore) {
                 best = el;
                 bestScore = score;
             }

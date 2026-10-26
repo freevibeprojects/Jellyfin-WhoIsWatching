@@ -94,6 +94,12 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   ok(await page.evaluate(() => document.activeElement.dataset.action) === 'manage', 'ArrowDown moves to Manage profiles');
   await page.keyboard.press('ArrowRight');
   ok(await page.evaluate(() => document.activeElement.dataset.action) === 'account', 'ArrowRight moves to the gear (Account settings)');
+  await page.keyboard.press('ArrowRight');
+  ok(await page.evaluate(() => document.activeElement.dataset.action) === 'account', 'ArrowRight from the gear stays on its row');
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowDown');
+  ok(await page.evaluate(() => document.activeElement.dataset.action) === 'manage', 'ArrowDown from any profile goes to Manage profiles, not the gear');
   ok(await page.$eval('[data-action=account]', b => b.getAttribute('aria-label') === 'Account settings' && !!b.querySelector('svg')), 'Account settings is a gear icon');
   await page.keyboard.press('Escape');
   ok(!(await page.$('.wiw[open]')), 'Escape closes');
