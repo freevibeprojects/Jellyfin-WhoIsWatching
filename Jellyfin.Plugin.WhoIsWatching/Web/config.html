@@ -16,7 +16,7 @@
                         <input is="emby-input" type="text" id="wiwBrandText" maxlength="40" label="Text" />
                     </div>
                     <div class="inputContainer">
-                        <label for="wiwBrandColor">Colour</label>
+                        <label for="wiwBrandColor">Color</label>
                         <input type="color" id="wiwBrandColor" style="display:block;width:4em;height:2.5em;margin-top:.5em" />
                     </div>
                     <div class="inputContainer">
@@ -36,9 +36,12 @@
                 </form>
 
                 <h2 style="margin-top:2em">Profile pictures</h2>
-                <p class="fieldDescription">The shared gallery people pick from under "Manage profiles". Removing a picture here doesn't change anyone's current profile picture.</p>
+                <p class="fieldDescription">The shared gallery people pick from under "Manage profiles". Pictures are added there: click your avatar, then Manage profiles, a profile, and the + tile. Removing a picture here doesn't change anyone's current profile picture.</p>
                 <p id="wiwGalleryCount" class="fieldDescription"></p>
                 <div id="wiwGallery" style="display:flex;flex-wrap:wrap;gap:1em"></div>
+
+                <h2 style="margin-top:2em">Sign-in safety</h2>
+                <p class="fieldDescription">The picker lists the same profiles as Jellyfin's sign-in page, and anyone at a device can try their passwords, also through Other account. Jellyfin doesn't limit failed attempts unless you ask it to: for each account, especially administrators, set the number of failed login attempts before lockout (Dashboard, Users, the user, Profile). Accounts hidden from the sign-in screen aren't listed, but can still be typed in.</p>
             </div>
         </div>
         <script type="text/javascript">
