@@ -4,7 +4,9 @@
 // Jellyfin surface this depends on (keep this list current when Jellyfin changes):
 //   - window.ApiClient: getCurrentUserId, getCurrentUser, getJSON, getUrl, getUserImageUrl,
 //     accessToken, authenticateUserByName (the same call the login page makes); optionally
-//     onAuthenticated (remembered profiles), logout (wrapped to forget them), uploadUserImage
+//     onAuthenticated (remembered profiles), logout (wrapped to forget them), uploadUserImage;
+//     window.ApiClient's first assignment is watched (the sign-in page's profiles are requested then)
+//   - localStorage: jellyfin_credentials (whether a sign-in is saved) and enableAutoLogin (Remember me)
 //   - GET /Users/Public (the login screen's user list), GET /Users/Me, POST /Sessions/Logout
 //   - AVATAR_SELECTOR below, and the theme's .button-submit colour (accent)
 //   - this plugin's GET /WhoIsWatching/Settings (brand text) and /WhoIsWatching/Images (the shared
@@ -88,6 +90,7 @@
 .wiw:focus{outline:none}
 .wiw::backdrop{background:var(--jf-palette-background-default,#101010)}
 .wiw[aria-busy=true]{cursor:progress}
+.wiw.wiw-instant{animation:none}
 .wiw-panel{margin:auto;display:flex;flex-direction:column;align-items:center;gap:2em;text-align:center;max-width:64em}
 .wiw-title{margin:0;font-size:3em;font-weight:500}
 .wiw-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:calc(2 * var(--u));margin:0;padding:0;list-style:none}
@@ -206,6 +209,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     let bypass = false;
 
     let preload; // { api, at, data }: profiles requested when the avatar was pressed, for the click that follows
+    let early; // { api, at, data }: the sign-in page's data, requested before the page shows (see prefetch)
 
     window.addEventListener('click', onAvatarClick, true);
     // Pressing the avatar starts loading, so the picker can open as the click lands (a press lasts
@@ -230,6 +234,14 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     };
     document.addEventListener('viewbeforeshow', onView, true);
     document.addEventListener('viewshow', onView, true);
+    // Signed out, Jellyfin Web makes several more round trips after creating its ApiClient before it
+    // shows the sign-in page, so the profiles requested right then are there before the page is.
+    // Not when Jellyfin has a sign-in saved: the page rarely shows then.
+    whenApiClient(api => {
+        if (hasApi(api) && !api.getCurrentUserId() && !savedSignIn()) {
+            prefetch(api);
+        }
+    });
     if (onLoginPage()) {
         openSignIn(document.getElementById('loginPage'));
     }
@@ -256,6 +268,53 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         return Boolean(page) && !page.classList.contains('hide');
     }
 
+    // Calls back once with Jellyfin's ApiClient, the moment Jellyfin Web sets window.ApiClient.
+    function whenApiClient(callback) {
+        if (window.ApiClient) {
+            callback(window.ApiClient);
+            return;
+        }
+
+        try {
+            Object.defineProperty(window, 'ApiClient', {
+                configurable: true,
+                enumerable: true,
+                get: () => undefined,
+                set(api) {
+                    // A plain property again, before anything here can fail Jellyfin's assignment.
+                    Object.defineProperty(window, 'ApiClient', { configurable: true, enumerable: true, writable: true, value: api });
+                    try {
+                        callback(api);
+                    } catch (err) {
+                        console.warn('[WhoIsWatching] could not prepare the sign-in page', err);
+                    }
+                }
+            });
+        } catch (err) {
+            // Defined by someone else and locked: the sign-in page loads its profiles when it shows.
+        }
+    }
+
+    // Whether Jellyfin Web has a sign-in saved (its "Remember me"), as it stores them.
+    function savedSignIn() {
+        try {
+            return JSON.parse(localStorage.getItem('jellyfin_credentials')).Servers.some(server => server.AccessToken);
+        } catch (err) {
+            return false;
+        }
+    }
+
+    // Requests the sign-in page's data ahead, and puts the profile pictures in the browser's cache.
+    function prefetch(api) {
+        const data = signInData(api);
+        early = { api, at: Date.now(), data };
+        data.then(([users]) => users.forEach(user => {
+            if (user.PrimaryImageTag) {
+                new Image().src = avatarUrl(api, user);
+            }
+        })).catch(() => {});
+    }
+
     // Signed out: the same picker, without "you", settings or Manage profiles. Jellyfin's page stays
     // underneath (Other ways to sign in) for manual sign-in, Quick Connect and "Forgot password".
     async function openSignIn(page) {
@@ -277,9 +336,11 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         let users = [];
         let settings = null;
         let branding = null;
+        // Usually requested ahead (at start-up or sign-out) and already here, so the picker shows at once.
+        const ahead = early && early.api === api && Date.now() - early.at < 60000 ? early.data : null;
+        early = null;
         try {
-            [[users, settings], branding] = await Promise.all([load(api),
-                api.getJSON(api.getUrl('Branding/Configuration')).catch(() => null)]);
+            [users, settings, branding] = await (ahead ? ahead.catch(() => signInData(api)) : signInData(api));
         } catch (err) {
             console.warn('[WhoIsWatching] could not load profiles', err);
         } finally {
@@ -296,6 +357,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
                 disclaimer.textContent = (branding && branding.LoginDisclaimer) || '';
                 disclaimer.hidden = !disclaimer.textContent.trim();
                 dialog.setAttribute('aria-describedby', disclaimer.hidden ? '' : disclaimer.id);
+                followLateStyles();
             }
         } catch (err) {
             console.warn('[WhoIsWatching] could not show profiles', err);
@@ -306,9 +368,43 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         }
     }
 
+    // Jellyfin applies the server's Custom CSS only once its sign-in page shows, and a theme sheet may
+    // still be loading, so while the picker covers that page it follows styles as they arrive.
+    function followLateStyles() {
+        const observer = new MutationObserver(records => {
+            let restyled = false;
+            for (const record of records) {
+                for (const node of [record.target, record.target.parentNode, ...record.addedNodes]) {
+                    if (node && node.nodeName === 'LINK') {
+                        node.addEventListener('load', followTheme, { once: true });
+                    }
+
+                    restyled = restyled || Boolean(node && (node.nodeName === 'STYLE' || node.nodeName === 'LINK'));
+                }
+            }
+
+            if (restyled) {
+                followTheme();
+            }
+        });
+        observer.observe(document.documentElement, { childList: true, characterData: true, subtree: true });
+        dialog.addEventListener('close', () => observer.disconnect(), { once: true });
+    }
+
     // The profiles and the brand settings, in parallel.
     function load(api) {
-        return Promise.all([loadUsers(api), api.getJSON(api.getUrl('WhoIsWatching/Settings')).catch(() => null)]);
+        return Promise.all([loadUsers(api), brandSettings(api)]);
+    }
+
+    function brandSettings(api) {
+        return api.getJSON(api.getUrl('WhoIsWatching/Settings')).catch(() => null);
+    }
+
+    // The sign-in page's profiles (only the public list, even mid sign-out), brand settings and
+    // Jellyfin's branding (for its Login Disclaimer), in parallel.
+    function signInData(api) {
+        return Promise.all([api.getJSON(api.getUrl('Users/Public')), brandSettings(api),
+            api.getJSON(api.getUrl('Branding/Configuration')).catch(() => null)]);
     }
 
     async function onAvatarClick(e) {
@@ -398,6 +494,8 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         }
 
         managing = false;
+        // Over the sign-in page there is nothing to fade in from: it shows at once.
+        dialog.classList.toggle('wiw-instant', !trigger);
         pickPanel.querySelector('.wiw-disclaimer').hidden = true;
         dialog.removeAttribute('aria-describedby');
         followTheme();
@@ -722,7 +820,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             img.alt = '';
             img.decoding = 'async';
             img.onerror = () => img.remove();
-            img.src = api.getUserImageUrl(user.Id, { type: 'Primary', tag: user.PrimaryImageTag, maxWidth: 320 });
+            img.src = avatarUrl(api, user);
             el.append(img);
         }
 
@@ -734,6 +832,10 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         }
 
         return el;
+    }
+
+    function avatarUrl(api, user) {
+        return api.getUserImageUrl(user.Id, { type: 'Primary', tag: user.PrimaryImageTag, maxWidth: 320 });
     }
 
     async function select(api, user, button) {
@@ -871,6 +973,12 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             }
 
             store(api, REMEMBERED_KEY, {});
+            // The sign-in page comes next: its profiles load alongside the sign-out (the ending
+            // token doesn't matter to these anonymous requests).
+            if (hasApi(api)) {
+                prefetch(api);
+            }
+
             return logout.apply(this, args);
         };
     }

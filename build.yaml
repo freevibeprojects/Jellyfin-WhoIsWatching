@@ -1,7 +1,7 @@
 ---
 name: "Who's Watching"
 guid: "2d627493-2b57-432a-b238-c22aaf9fd609"
-version: "1.4.1.0"
+version: "1.4.2.0"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 overview: "Netflix-style profile switching from the avatar button in Jellyfin Web"
@@ -15,5 +15,5 @@ owner: "freevibeprojects"
 artifacts:
   - "Jellyfin.Plugin.WhoIsWatching.dll"
 changelog: >
-  Adding a photo to the gallery is lighter on phones: the full-size photo is freed from memory as
-  soon as it is shrunk, instead of being held through the upload.
+  The sign-in page opens instantly again: the profiles and their pictures are loaded while Jellyfin
+  starts (and when you sign out), so the picker is ready the moment the page is, with no fade-in.

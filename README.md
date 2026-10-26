@@ -6,7 +6,7 @@ if needed, and you are now that user.
 
 - Jellyfin **12.0+** (built against 12.0.0, tested on 12.2.0)
 - Server side: one ~85 KB DLL with no dependencies, no background work and no database. A settings page in the dashboard; the shared picture gallery is plain files.
-- Client side: one 60 KB script (16 KB compressed), loaded once and idle until the sign-in page shows or the avatar is clicked
+- Client side: one 65 KB script (about 20 KB compressed), cached after the first load. Signed out, it loads the sign-in page's profiles while Jellyfin Web starts; signed in, it stays idle until the avatar is clicked
 
 **Install:** add `https://raw.githubusercontent.com/freevibeprojects/Jellyfin-WhoIsWatching/main/manifest.json` as a repository in *Dashboard → Plugins → Manage Repositories*, then install **Who's Watching** from *Available*. See [Install](#install).
 
@@ -32,6 +32,8 @@ There is no new authentication endpoint, session store, cookie or cryptography. 
 ### The sign-in page
 
 Signed out (a first visit, or after signing out), the picker covers Jellyfin's sign-in page and lists the same profiles. Jellyfin's page stays underneath: **Other ways to sign in** (or Escape) shows it, for manual sign-in (profiles hidden from the sign-in screen), Quick Connect and *Forgot password*. Jellyfin's *Login Disclaimer* (Dashboard → General → Branding) is shown under the profiles, as plain text. After signing in you land where Jellyfin's page would have taken you (a shared link, for example). If no profile is listed, Jellyfin's page shows as it is.
+
+The picker is ready when the page is. The profiles, the brand text and the profile pictures are requested while Jellyfin Web is still starting (it makes several more round trips before it shows its sign-in page) and when you sign out, and the picker shows without fading in. Jellyfin applies the server's Custom CSS only once its sign-in page shows, so the picker picks up the page background when that arrives.
 
 ### Password behaviour
 
@@ -102,7 +104,7 @@ The end-to-end test runs once more with these APIs removed (`OLD_ENGINE=1`).
    - Jellyfin Desktop / Media Player: restart the app.
    - **Android app: swipe it away (or Force stop) and reopen it.** It keeps its page loaded in the background.
 2. **Another profile must be visible to the signed-in user.** The picker lists the profiles the sign-in screen shows, plus yourself. If every other account has *Hide this user from login screens* ticked (Jellyfin 12's default for new users), there is nothing to switch to and the avatar keeps its normal action. Fix it in *Dashboard → Users → (user) → Profile*.
-3. **Check the console** (F12 in browsers). `[WhoIsWatching] 1.4.1.0 loaded` confirms the script is there, and a second `[WhoIsWatching]` line says why the avatar was left alone.
+3. **Check the console** (F12 in browsers). `[WhoIsWatching] 1.4.2.0 loaded` confirms the script is there, and a second `[WhoIsWatching]` line says why the avatar was left alone.
 
 ## Compatibility surface
 
@@ -113,11 +115,11 @@ Jellyfin has no official extension point for the main web UI, so the plugin reli
 | `IPluginServiceRegistrator` | Public plugin API |
 | `IStartupFilter` honoured by Jellyfin's ASP.NET Core generic host | Standard ASP.NET Core; Jellyfin has used `Host.CreateDefaultBuilder` + `UseStartup` since 10.x |
 | `/Users/Public`, `/Users/AuthenticateByName`, `/Sessions/Logout` | Public REST API |
-| `window.ApiClient` and its methods | Undocumented global, but jellyfin-web keeps it for plugins and uses it in its own code. `client.js` checks each method before taking over the click. Optional extras are checked too: `onAuthenticated` (Remember on this device), `logout` (wrapped so signing out forgets remembered profiles), `uploadUserImage` (Manage profiles). |
+| `window.ApiClient` and its methods | Undocumented global, but jellyfin-web keeps it for plugins and uses it in its own code. `client.js` checks each method before taking over the click. Optional extras are checked too: `onAuthenticated` (Remember on this device), `logout` (wrapped so signing out forgets remembered profiles), `uploadUserImage` (Manage profiles). Its first assignment is watched, to request the sign-in page's profiles early. |
 | `.button-submit` colour | Read at runtime for the accent; falls back to the theme variable and then Jellyfin blue |
 | The sign-in page: `#loginPage`, its `viewbeforeshow`/`viewshow` events, `GET /Branding/Configuration` | Internal markup and events; without them the sign-in page is Jellyfin's own, and the avatar still works |
 | Jellyfin's classes `emby-button`, `raised`, `button-submit`, `emby-input`, `emby-checkbox`, `paper-icon-button-light`, `cardImageContainer`, `defaultCardBackground1-5`, and `--jf-card-borderRadius` | Used for the look only; if renamed, the controls fall back to the browser's plain style |
-| `localStorage.enableAutoLogin` | Jellyfin Web's *Remember me* setting; see *Password behaviour* |
+| `localStorage.enableAutoLogin`, `localStorage.jellyfin_credentials` | Jellyfin Web's *Remember me* setting (see *Password behaviour*), and its saved sign-ins, only read: with one saved, the sign-in page's profiles aren't requested early. Without them, the sign-in page waits for its profiles, as in 1.4.1. |
 | Avatar selectors `.headerUserButton`, `[aria-controls="app-user-menu"]` | Internal markup, **the most likely thing to break**. One constant at the top of `client.js`. |
 | `--jf-palette-*` CSS variables | MUI theme variables; every use has a fallback colour |
 
@@ -193,7 +195,7 @@ Some Linux-distro .NET SDKs ship without the ASP.NET Core targeting pack and fai
 - passwordless one-click switching, and that a tampered passwordless hint triggers no sign-in attempt
 - Remember on this device: one click with no password sent, administrators excluded, an ended session asking for the password again, and signing out forgetting remembered profiles
 - Manage profiles (who may change which picture), adding a gallery picture (square, at most 512 px), reusing it for another profile, and the dashboard page saving settings and deleting pictures
-- the sign-in page: the picker over it, Other ways to sign in, signing in from it, the Login Disclaimer and the page background
+- the sign-in page: the picker over it, ready with the page (profiles requested ahead on a first visit and at sign-out, no fade-in), Other ways to sign in, signing in from it, the Login Disclaimer and the page background
 - the brand text (default and custom), the gear icon, and Custom CSS reaching the picture rounding, the Sign in button and the password field
 - switching where Jellyfin's *Remember me* was unticked, the TV layout without a file picker, and the gallery's per-person cap
 - scaling (profiles 4/3 as big at 1440p and twice as big at 4K as at 1080p, no sideways overflow on phones), and that pressing the avatar preloads the profiles

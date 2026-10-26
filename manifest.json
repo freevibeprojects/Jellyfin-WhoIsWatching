@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.4.2.0",
+        "changelog": "The sign-in page opens instantly again: the profiles and their pictures are loaded while Jellyfin starts (and when you sign out), so the picker is ready the moment the page is, with no fade-in.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/freevibeprojects/Jellyfin-WhoIsWatching/main/releases/who-is-watching_1.4.2.0.zip",
+        "checksum": "435aa48c2fd9e73a5026c4b874b529bd",
+        "timestamp": "2026-10-26T17:39:39Z"
+      },
+      {
         "version": "1.4.1.0",
         "changelog": "Adding a photo to the gallery is lighter on phones: the full-size photo is freed from memory as soon as it is shrunk, instead of being held through the upload.",
         "targetAbi": "12.0.0.0",

@@ -27,8 +27,12 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   // Safari, WebViews and Jellyfin Media Player's Chromium, so the fallbacks are exercised.
   if (process.env.OLD_ENGINE) await page.addInitScript(() => { delete window.HTMLDialogElement; delete Element.prototype.replaceChildren; delete window.createImageBitmap; });
   // first visit, signed out: the picker covers Jellyfin's sign-in page, which stays reachable
+  await page.addInitScript(() => document.addEventListener('viewbeforeshow', e => { if (e.target.id === 'loginPage' && !window.loginShownAt) window.loginShownAt = performance.now(); }, true));
+  const profilesAhead = since => page.evaluate(t => performance.getEntriesByType('resource').some(e => /\/Users\/Public$/.test(e.name) && e.startTime > t && e.startTime < window.loginShownAt), since);
   await page.goto(B + '/web/');
   await page.waitForSelector('.wiw[open] .wiw-grid button', { timeout: 30000 });
+  const instant = { ahead: await profilesAhead(0), noFade: await page.$eval('.wiw', d => getComputedStyle(d).animationName === 'none') };
+  ok(instant.ahead && instant.noFade, 'the sign-in picker is ready with the page: profiles requested ahead, no fade-in ' + JSON.stringify(instant));
   const signedOut = await page.evaluate(() => ({
     names: Array.from(document.querySelectorAll('.wiw-grid .wiw-name'), e => e.textContent).join(),
     noSettings: document.querySelector('[data-action=manage]').hidden && document.querySelector('[data-action=account]').hidden,
@@ -399,8 +403,12 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   const kidId = await page.evaluate(async () => (await window.ApiClient.getJSON(window.ApiClient.getUrl('Users/Public'))).find(u => u.Name === 'Kid').Id);
   const kidToken = await signIn('Kid', '', 'e2e-kid');
   await page.evaluate(([id, token]) => { const key = 'whoiswatching-remembered-' + window.ApiClient.serverId(); localStorage.setItem(key, JSON.stringify({ ...JSON.parse(localStorage.getItem(key)), [id]: token })); }, [kidId, kidToken]);
-  await page.evaluate(() => window.ApiClient.logout());
+  const signOutAt = await page.evaluate(() => { window.loginShownAt = 0; performance.clearResourceTimings(); return performance.now(); });
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => window.Dashboard.logout()); // Jellyfin's own sign-out, then its sign-in page
   await page.waitForTimeout(500);
   ok(JSON.stringify(await remembered()) === '{}' && (await fetch(B + '/Users/Me', { headers: auth(kidToken) })).status === 401, 'signing out forgets remembered profiles and ends their sessions');
+  await page.waitForSelector('.wiw[open] .wiw-grid button', { timeout: 30000 });
+  ok(await profilesAhead(signOutAt), 'after signing out, the picker’s profiles were requested before the sign-in page showed');
   await browser.close();
 })().catch(e => { console.log('FAIL exception ' + e.message); process.exit(1); });
