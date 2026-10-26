@@ -399,7 +399,10 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   ok(notes.some(n => /^\[WhoIsWatching\] \d+(\.\d+){3} loaded$/.test(n)), 'console says which version loaded: ' + notes[0]);
   ok(!process.env.OLD_ENGINE || await page.evaluate(() => document.querySelector('.wiw').tagName === 'DIV'), 'old engine: the <div> stand-in was used');
 
-  // signing out of Jellyfin forgets remembered profiles and ends their sessions
+  // signing out of Jellyfin forgets remembered profiles and ends their sessions, even with nothing
+  // clicked since the page loaded
+  await page.reload();
+  await avatar.waitFor({ timeout: 30000 });
   const kidId = await page.evaluate(async () => (await window.ApiClient.getJSON(window.ApiClient.getUrl('Users/Public'))).find(u => u.Name === 'Kid').Id);
   const kidToken = await signIn('Kid', '', 'e2e-kid');
   await page.evaluate(([id, token]) => { const key = 'whoiswatching-remembered-' + window.ApiClient.serverId(); localStorage.setItem(key, JSON.stringify({ ...JSON.parse(localStorage.getItem(key)), [id]: token })); }, [kidId, kidToken]);

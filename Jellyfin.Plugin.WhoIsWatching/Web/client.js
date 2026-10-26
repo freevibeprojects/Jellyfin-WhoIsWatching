@@ -236,8 +236,10 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     document.addEventListener('viewshow', onView, true);
     // Signed out, Jellyfin Web makes several more round trips after creating its ApiClient before it
     // shows the sign-in page, so the profiles requested right then are there before the page is.
-    // Not when Jellyfin has a sign-in saved: the page rarely shows then.
+    // Not when Jellyfin has a sign-in saved: the page rarely shows then. Signing out is watched from
+    // here on too, so it forgets remembered profiles even when nothing was clicked before it.
     whenApiClient(api => {
+        watchSignOut(api);
         if (hasApi(api) && !api.getCurrentUserId() && !savedSignIn()) {
             prefetch(api);
         }
