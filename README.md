@@ -31,7 +31,9 @@ There is no new authentication endpoint, session store, cookie or cryptography. 
 
 ### The sign-in page
 
-Signed out (a first visit, or after signing out), the picker covers Jellyfin's sign-in page and lists the same profiles. Jellyfin's page stays underneath: **Other ways to sign in** (or Escape) shows it, for manual sign-in (profiles hidden from the sign-in screen), Quick Connect and *Forgot password*. Jellyfin's *Login Disclaimer* (Dashboard → General → Branding) is shown under the profiles, as plain text. After signing in you land where Jellyfin's page would have taken you (a shared link, for example). If no profile is listed, Jellyfin's page shows as it is.
+Signed out (a first visit, or after signing out), the picker covers Jellyfin's sign-in page and lists the same profiles. Jellyfin's page stays underneath: **Other ways to sign in** (or Escape) shows it, for Quick Connect and *Forgot password*. Jellyfin's *Login Disclaimer* (Dashboard → General → Branding) is shown under the profiles, as plain text. After signing in you land where Jellyfin's page would have taken you (a shared link, for example). If no profile is listed, Jellyfin's page shows as it is.
+
+**Other account**, the last tile, signs in to an account the list doesn't show (one hidden from the sign-in screen, such as the administrator's) by asking for its name and password. It is there on the avatar's picker too, so switching to a hidden account doesn't need signing out first.
 
 The picker is ready when the page is. The profiles, the brand text and the profile pictures are requested while Jellyfin Web is still starting (it makes several more round trips before it shows its sign-in page) and when you sign out, and the picker shows without fading in. Jellyfin applies the server's Custom CSS only once its sign-in page shows, so the picker picks up the page background when that arrives.
 
@@ -46,6 +48,7 @@ Jellyfin 12 never tells clients whether a user has a password: `UserDto.HasPassw
   - **Administrator accounts can never be remembered.** They always ask for the password, so a child on a shared TV can't one-click into the account that controls parental settings.
   - A remembered profile is forgotten, and asks for its password again, when its password is changed, its session is ended (for example from *Dashboard → Devices*), or anyone signs out of Jellyfin in this browser. Signing out also ends every remembered profile's session.
   - The server still applies the profile's rules (disabled account, access schedule, remote access) every time it is used.
+  - Accounts signed in to through *Other account* aren't offered it: they aren't listed, so there is no profile to open in one click.
 - Signing in from the picker always keeps the session across reloads, like Jellyfin's own *Remember me* (its default). The picker reloads the page after every sign-in, so it turns that setting back on if it was unticked earlier in this browser; otherwise the reload would land on the sign-in page again.
 
 ### Look
@@ -74,7 +77,7 @@ The gallery is kept on the server in `<data dir>/plugins/configurations/WhoIsWat
 
 **Jellyfin 12 hides new users from login screens by default**, and the picker shows exactly the users the login screen would. For each profile that should appear, go to *Dashboard → Users → (user) → Profile* and untick **Hide this user from login screens**.
 
-If no other profile is visible, the avatar button behaves exactly as without the plugin.
+Hidden accounts stay reachable through **Other account**, which asks for the name as well as the password.
 
 If a profile goes missing from the picker, check whether it was locked out: after too many wrong passwords (*Dashboard → Users → (user) → Profile → login attempts before lockout*), Jellyfin disables the account, so it is no longer listed. Re-enable it on the same page.
 
@@ -103,7 +106,7 @@ The end-to-end test runs once more with these APIs removed (`OLD_ENGINE=1`).
    - Browsers: press F5.
    - Jellyfin Desktop / Media Player: restart the app.
    - **Android app: swipe it away (or Force stop) and reopen it.** It keeps its page loaded in the background.
-2. **Another profile must be visible to the signed-in user.** The picker lists the profiles the sign-in screen shows, plus yourself. If every other account has *Hide this user from login screens* ticked (Jellyfin 12's default for new users), there is nothing to switch to and the avatar keeps its normal action. Fix it in *Dashboard → Users → (user) → Profile*.
+2. **Profiles missing from the picker?** It lists the profiles the sign-in screen shows, plus yourself. Accounts with *Hide this user from login screens* ticked (Jellyfin 12's default for new users) are reached through *Other account*; to list one, untick it in *Dashboard → Users → (user) → Profile*.
 3. **Check the console** (F12 in browsers). `[WhoIsWatching] 1.4.2.0 loaded` confirms the script is there, and a second `[WhoIsWatching]` line says why the avatar was left alone.
 
 ## Compatibility surface
@@ -142,7 +145,7 @@ After a Jellyfin upgrade, run the smoke test (below) to check all of these at on
   - Profile pictures are applied through Jellyfin's own API, so Jellyfin's permission checks decide who may change whose picture.
 - Lockout, parental access schedules, device restrictions, max sessions and remote-access policy are all enforced by the server, because the plugin goes through Jellyfin's normal sign-in.
 - Switching signs the previous profile out on this device. Other open tabs still running as that profile lose access, because its token is revoked, and pick up the new profile when reloaded. They share the browser's stored session, as with any Jellyfin sign-in.
-- Anyone who can open the picker can attempt any listed profile's password. That is the same exposure as Jellyfin's login screen, which shows the same list to anyone. Use *Hide this user from login screens* for accounts that shouldn't be offered.
+- Anyone who can open the picker can attempt any listed profile's password. That is the same exposure as Jellyfin's login screen, which shows the same list to anyone. Use *Hide this user from login screens* for accounts that shouldn't be offered. *Other account* takes any name, as Jellyfin's manual sign-in does, and every refusal looks the same, so it doesn't reveal which names exist.
 
 ## Limitations
 
@@ -193,7 +196,8 @@ Some Linux-distro .NET SDKs ship without the ASP.NET Core targeting pack and fai
 - that a wrong password leaves the current session untouched
 - switching, and that the previous token is revoked
 - passwordless one-click switching, and that a tampered passwordless hint triggers no sign-in attempt
-- Remember on this device: one click with no password sent, administrators excluded, an ended session asking for the password again, and signing out forgetting remembered profiles
+- Remember on this device: one click with no password sent, administrators excluded, an ended session asking for the password again, and signing out (even with nothing clicked first) forgetting remembered profiles
+- switching to an account hidden from the sign-in screen through Other account, without signing out
 - Manage profiles (who may change which picture), adding a gallery picture (square, at most 512 px), reusing it for another profile, and the dashboard page saving settings and deleting pictures
 - the sign-in page: the picker over it, ready with the page (profiles requested ahead on a first visit and at sign-out, no fade-in), Other ways to sign in, signing in from it, the Login Disclaimer and the page background
 - the brand text (default and custom), the gear icon, and Custom CSS reaching the picture rounding, the Sign in button and the password field

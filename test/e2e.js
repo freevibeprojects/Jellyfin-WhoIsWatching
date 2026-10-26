@@ -40,7 +40,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
     brand: document.querySelector('.wiw-brand').textContent,
     page: location.hash
   }));
-  ok(signedOut.names === 'Alice,Bob,Kid' && signedOut.noSettings && signedOut.other && signedOut.brand && signedOut.page.includes('login'), 'signed out, the picker covers the sign-in page: ' + JSON.stringify(signedOut));
+  ok(signedOut.names === 'Alice,Bob,Kid,Other account' && signedOut.noSettings && signedOut.other && signedOut.brand && signedOut.page.includes('login'), 'signed out, the picker covers the sign-in page: ' + JSON.stringify(signedOut));
   await page.waitForTimeout(400); await page.screenshot({ path: out + '/' + (layout || 'default') + '-0-signin.png' });
   await page.click('.wiw-other');
   ok(!(await page.$('.wiw[open]')) && await page.isVisible('#loginPage .btnManual') && await page.waitForFunction(() => document.getElementById('loginPage').contains(document.activeElement), null, { timeout: 3000 }).then(() => true, () => false), 'Other ways to sign in shows Jellyfin’s sign-in page, focus on it');
@@ -82,7 +82,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.waitForSelector('.wiw[open]');
   ok(whilePressed === 1 && profileLoads === 1, `pressing the avatar preloads the profiles (${whilePressed} while pressed, ${profileLoads} in all)`);
   const names = await page.$$eval('.wiw-grid .wiw-name', els => els.map(e => e.textContent));
-  ok(JSON.stringify(names) === '["Alice","Bob","Kid"]', 'grid shows public users only: ' + names);
+  ok(JSON.stringify(names) === '["Alice","Bob","Kid","Other account"]', 'grid shows public users only, then Other account: ' + names);
   ok(await page.evaluate(() => document.activeElement.getAttribute('aria-label')) === 'Alice, current profile', 'focus starts on current profile');
   await page.waitForTimeout(400); await page.screenshot({ path: out + '/' + (layout || 'default') + '-1-grid.png' });
   ok(await page.waitForFunction(() => { const i = document.querySelector('.wiw-grid button[aria-label="Bob"] img'); return i && i.complete && i.naturalWidth > 0; }, null, { timeout: 5000 }).then(() => true, () => false), 'profile avatar image loads');
@@ -313,7 +313,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   // a non-administrator manages only their own profile, and may add pictures
   await avatar.click();
   await page.click('[data-action=manage]');
-  const marks = await page.$$eval('.wiw-grid .wiw-profile', els => els.map(e => e.getAttribute('aria-label') + (e.getAttribute('aria-disabled') ? ' (no)' : '')));
+  const marks = await page.$$eval('.wiw-grid li:not([hidden]) .wiw-profile', els => els.map(e => e.getAttribute('aria-label') + (e.getAttribute('aria-disabled') ? ' (no)' : '')));
   ok((await page.$$('.wiw-grid .wiw-pencil')).length === 1 && marks.includes('Bob, current profile, change picture'), 'Bob manages only his own profile: ' + marks.join('; '));
   await page.click('.wiw-grid button[aria-label^="Bob"]');
   ok(await page.waitForSelector(layout === 'tv' ? '.wiw-pictures:not([hidden]) .wiw-gallery li' : '.wiw-pictures:not([hidden]) .wiw-add', { timeout: 5000 }).then(() => true, () => false), 'Bob may add pictures (TV: the gallery opens)');
@@ -398,6 +398,16 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   ok(errors.length === 0, 'no page errors: ' + errors.join(' | '));
   ok(notes.some(n => /^\[WhoIsWatching\] \d+(\.\d+){3} loaded$/.test(n)), 'console says which version loaded: ' + notes[0]);
   ok(!process.env.OLD_ENGINE || await page.evaluate(() => document.querySelector('.wiw').tagName === 'DIV'), 'old engine: the <div> stand-in was used');
+
+  // an account hidden from the sign-in screen: Other account asks for its name, no signing out first
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.click('.wiw-grid li:last-child button');
+  await page.waitForSelector('.wiw-auth:not([hidden]) .wiw-username:focus');
+  ok(await page.textContent('.wiw-auth .wiw-name') === 'Other account' && !(await page.isVisible('.wiw-remember')), 'Other account asks for a name, without Remember on this device');
+  await page.fill('.wiw-username', 'Hidden');
+  await Promise.all([page.waitForEvent('load'), page.keyboard.press('Enter')]);
+  await avatar.waitFor({ timeout: 30000 });
+  ok(await me() === 'Hidden', 'switched to an account hidden from the sign-in screen, without signing out');
 
   // signing out of Jellyfin forgets remembered profiles and ends their sessions, even with nothing
   // clicked since the page loaded

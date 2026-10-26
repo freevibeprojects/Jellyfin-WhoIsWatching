@@ -18,7 +18,8 @@
 // A profile can also be remembered on this device: its Jellyfin access token is kept (never the
 // password), like Jellyfin's own "Remember me", so it opens in one click. Administrators never are.
 // Signed out, the picker covers Jellyfin's sign-in page, which stays underneath for manual sign-in,
-// Quick Connect and "Forgot password".
+// Quick Connect and "Forgot password". Accounts hidden from the sign-in screen (often the
+// administrator's) are reached through "Other account", which asks for the name too.
 // Controls carry Jellyfin's own classes (emby-button, emby-input, emby-checkbox, cardImageContainer,
 // defaultCardBackgroundN), so the active theme and custom CSS style them as on Jellyfin's pages.
 // When any of it is missing, the avatar button keeps its normal behaviour.
@@ -35,6 +36,8 @@
         account: 'Account settings',
         close: 'Close',
         password: 'Password',
+        username: 'Username',
+        otherAccount: 'Other account',
         signIn: 'Sign in',
         back: 'Back',
         passwordHint: 'Leave empty if this profile has no password.',
@@ -64,12 +67,13 @@
     const PASSWORDLESS_KEY = 'whoiswatching-passwordless-';
     const REMEMBERED_KEY = 'whoiswatching-remembered-';
     const CARD_COLORS = 5; // the theme's defaultCardBackground1..5, as on Jellyfin's sign-in page
-    // Material icons (Apache 2.0): close, settings, edit, add, arrow.
+    // Material icons (Apache 2.0): close, settings, edit, add, arrow, person.
     const ICON_CLOSE = 'M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z';
     const ICON_SETTINGS = 'M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z';
     const ICON_EDIT = 'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z';
     const ICON_ADD = 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z';
     const ICON_ARROW = 'M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z';
+    const ICON_PERSON = 'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z';
 
     // Everything scales with --u: 16px at 1080p, growing with the screen (21px at 1440p, 32px at 4K),
     // limited by height so wide or short windows still fit; phones are guarded with vw. Engines
@@ -108,6 +112,8 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 .wiw-busy .wiw-avatar{animation:wiw-pulse 1s ease-in-out infinite}
 .wiw-name{display:flex;align-items:center;gap:.3em;max-width:100%;font-size:1.05em;word-break:break-word;overflow-wrap:anywhere}
 .wiw svg{width:1em;height:1em;flex:none;fill:currentColor}
+.wiw-blank{background:var(--jf-palette-background-paper,#202020);color:var(--jf-palette-text-secondary,rgba(255,255,255,.7))}
+.wiw-blank svg{display:block}
 .wiw .wiw-button{justify-content:center;min-width:8em;margin:0;padding:.75em 1.6em}
 /* Jellyfin's buttons drop the outline (outline:none!important), and a submit button's focus colour
    can equal its normal one, so keyboard and remote focus also gets a ring. */
@@ -444,16 +450,12 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             opening = false;
         }
 
-        // Nobody to switch to, or the picker can't be shown: behave exactly as if the plugin were not installed.
+        // The profiles couldn't be loaded, or the picker can't be shown: behave exactly as if the plugin
+        // were not installed. With no one else listed it still opens: Other account reaches hidden accounts.
         try {
-            if (users.length >= 2) {
+            if (users.length) {
                 open(api, users, settings);
                 return;
-            }
-
-            if (users.length) {
-                console.info('[WhoIsWatching] no other profile is visible to this user (Dashboard \u2192 Users \u2192 Profile: '
-                    + '"Hide this user from login screens"); avatar left alone');
             }
         } catch (err) {
             console.warn('[WhoIsWatching] could not show profiles', err);
@@ -523,13 +525,16 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 
         const currentId = api.getCurrentUserId();
         buttons.clear();
+        const other = document.createElement('li');
+        other.hidden = managing;
+        other.append(otherButton(api));
         fill(pickPanel.querySelector('.wiw-grid'), ...users.map(user => {
             const li = document.createElement('li');
             const button = profileButton(api, user, user.Id === currentId);
             buttons.set(user.Id, button);
             li.append(button);
             return li;
-        }));
+        }), other);
         pickPanel.querySelector('.wiw-title').textContent = managing ? TEXT.manage : TEXT.title;
         const manage = pickPanel.querySelector('[data-action=manage]');
         manage.textContent = managing ? TEXT.done : TEXT.manage;
@@ -627,7 +632,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 </section>
 <form class="wiw-panel wiw-auth" hidden>
  <div class="wiw-who wiw-for"></div>
- <input class="wiw-username" type="text" autocomplete="username" hidden>
+ <label class="wiw-field wiw-account" hidden><span class="inputLabel">${TEXT.username}</span><input class="wiw-username emby-input" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
  <label class="wiw-field"><span class="inputLabel">${TEXT.password}</span><input class="wiw-input emby-input" type="password" autocomplete="current-password" aria-describedby="wiw-hint"><span class="wiw-hint fieldDescription" id="wiw-hint">${TEXT.passwordHint}</span></label>
  <div class="wiw-check checkboxContainer">
   <label class="emby-checkbox-label"><input class="wiw-remember emby-checkbox" type="checkbox" aria-describedby="wiw-remember-hint"><span class="checkboxLabel">${TEXT.remember}</span><span class="checkboxOutline"><span class="material-icons checkboxIcon checkboxIcon-checked check" aria-hidden="true"></span><span class="material-icons checkboxIcon checkboxIcon-unchecked" aria-hidden="true"></span></span></label>
@@ -686,7 +691,8 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             const input = authPanel.querySelector('.wiw-input');
             const password = input.value;
             input.value = '';
-            const err = await switchTo(pending.user, password, authPanel.querySelector('.wiw-remember').checked);
+            const user = pending.user || { Name: authPanel.querySelector('.wiw-username').value.trim() };
+            const err = await switchTo(user, password, Boolean(pending.user) && authPanel.querySelector('.wiw-remember').checked);
             setError(failure(err));
             input.focus();
         });
@@ -795,13 +801,30 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         return button;
     }
 
+    // "Other account" (user null): signs in to any account by name, such as one hidden from the
+    // sign-in screen, without signing out first.
+    function otherButton(api) {
+        const button = profile(api, null, 'button');
+        button.type = 'button';
+        button.addEventListener('click', () => askPassword(api, null, button));
+        return button;
+    }
+
     function profile(api, user, tag, pencil) {
         const el = document.createElement(tag);
         el.className = 'wiw-profile';
         const name = document.createElement('span');
         name.className = 'wiw-name';
-        name.textContent = user.Name;
-        el.append(avatar(api, user, pencil), name);
+        name.textContent = user ? user.Name : TEXT.otherAccount;
+        el.append(user ? avatar(api, user, pencil) : blankAvatar(), name);
+        return el;
+    }
+
+    function blankAvatar() {
+        const el = document.createElement('span');
+        el.className = 'wiw-avatar wiw-blank cardImageContainer';
+        el.setAttribute('aria-hidden', 'true');
+        el.innerHTML = `<span class="wiw-initial">${icon(ICON_PERSON)}</span>`; // sized like a profile's initial
         return el;
     }
 
@@ -868,14 +891,21 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             forget(api, user.Id);
         }
 
+        askPassword(api, user, button, token);
+    }
+
+    // The password step for a listed profile, or (user null) for an account typed by name. A typed
+    // account isn't offered Remember on this device: it has no profile here to open in one click.
+    function askPassword(api, user, button, token) {
         pending = { user, button };
         fill(authPanel.querySelector('.wiw-who'), profile(api, user, 'div'));
-        authPanel.querySelector('.wiw-username').value = user.Name;
-        authPanel.querySelector('.wiw-check').hidden = !canRemember(api) || isAdmin(user);
+        authPanel.querySelector('.wiw-account').hidden = Boolean(user);
+        authPanel.querySelector('.wiw-username').value = user ? user.Name : '';
+        authPanel.querySelector('.wiw-check').hidden = !user || !canRemember(api) || isAdmin(user);
         authPanel.querySelector('.wiw-remember').checked = Boolean(token);
         show(authPanel);
         setError('');
-        authPanel.querySelector('.wiw-input').focus();
+        authPanel.querySelector(user ? '.wiw-input' : '.wiw-username').focus();
     }
 
     function isAdmin(user) {
@@ -1366,14 +1396,14 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             return;
         }
 
-        // Left/Right stay with the password field's cursor; Up/Down move between controls.
+        // Left/Right stay with a text field's cursor; Up/Down move between controls.
         if (!/^Arrow(Left|Right|Up|Down)$/.test(e.key)
-            || (e.target.type === 'password' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight'))) {
+            || (e.target.classList.contains('emby-input') && (e.key === 'ArrowLeft' || e.key === 'ArrowRight'))) {
             return;
         }
 
         const panel = dialog.querySelector('.wiw-panel:not([hidden])');
-        const items = Array.from(dialog.querySelectorAll('.wiw-close, .wiw-panel button, .wiw-input, .wiw-remember'))
+        const items = Array.from(dialog.querySelectorAll('.wiw-close, .wiw-panel button, .wiw-username, .wiw-input, .wiw-remember'))
             .filter(el => !el.disabled && !el.hasAttribute('aria-disabled') && el.getClientRects().length
                 && (el.closest('.wiw-panel') === panel || el.classList.contains('wiw-close')));
         const next = nearest(items, document.activeElement, e.key);
