@@ -4,9 +4,9 @@ A Netflix-style **"Who's watching?"** profile switcher inside Jellyfin Web. It g
 sign-in page, and switches profile from your avatar in the top bar: pick a profile, enter its password
 if needed, and you are now that user.
 
-- Jellyfin **12.0+** (built against 12.0.0, tested on 12.2.0)
-- Server side: one ~85 KB DLL with no dependencies, no background work and no database. A settings page in the dashboard; the shared picture gallery is plain files.
-- Client side: one 65 KB script (about 20 KB compressed), cached after the first load. Signed out, it loads the sign-in page's profiles while Jellyfin Web starts; signed in, it stays idle until the avatar is clicked
+- Jellyfin **12.0+** (built against 12.0.0, tested on 12.3)
+- Server side: one ~120 KB DLL with no dependencies, no background work and no database. A settings page in the dashboard; the shared picture gallery is plain files.
+- Client side: one 80 KB script (about 25 KB compressed), cached after the first load. Signed out, it loads the sign-in page's profiles while Jellyfin Web starts; signed in, it stays idle until the avatar is clicked
 
 **Install:** add `https://raw.githubusercontent.com/freevibeprojects/Jellyfin-WhoIsWatching/main/manifest.json` as a repository in *Dashboard → Plugins → Manage Repositories*, then install **Who's Watching** from *Available*. See [Install](#install).
 
@@ -63,7 +63,7 @@ The brand text in the corner (like Netflix's logo) is set in *Dashboard → Plug
 
 It works like Netflix:
 
-1. **Manage profiles**, under the profiles, switches to edit mode. Profiles you may change show a pencil: your own, or every profile for administrators. This follows Jellyfin's rule *Allow this user to manage their own preferences*.
+1. **Manage profiles**, under the profiles, switches to edit mode. Profiles you may change show a pencil: your own, or every profile for administrators. This follows Jellyfin's user-preference access rule (`EnableUserPreferenceAccess` in the user's policy). It is on for every user unless an administrator turned it off through Jellyfin's API; Jellyfin 12's dashboard has no checkbox for it.
 2. Picking one opens **Choose a profile picture**, a page with a shared gallery that everyone sees. The **+** tile adds a picture to it. The picture is cropped to a centred square and shrunk to at most 512 px (JPEG) first, because Jellyfin serves profile pictures at their uploaded size.
 3. Picking a picture asks **Change profile picture?** (current → new), with **Let's do it** / **Not yet**.
 
@@ -75,9 +75,11 @@ The gallery is kept on the server in `<data dir>/plugins/configurations/WhoIsWat
 
 ## Admin setup
 
-**Jellyfin 12 hides new users from login screens by default**, and the picker shows exactly the users the login screen would. For each profile that should appear, go to *Dashboard → Users → (user) → Profile* and untick **Hide this user from login screens**.
+**Jellyfin 12 hides new users from login screens by default**, and the picker shows exactly the users the login screen would. For each profile that should appear, go to *Dashboard → Users*, open the user (or its ⋮ menu → *Edit user*), and on the *Profile* tab, near the bottom, untick **Hide this user from login screens**.
 
 Hidden accounts stay reachable through **Other account**, which asks for the name as well as the password.
+
+**Set a lockout.** Jellyfin doesn't limit failed sign-ins unless asked to, and anyone at a device can try passwords from the picker (a child on the family tablet, say), for listed profiles and, through *Other account*, hidden ones. For each account, administrators above all, set the failed login attempts before lockout on the same *Profile* tab. The plugin's dashboard page says so too.
 
 If a profile goes missing from the picker, check whether it was locked out: after too many wrong passwords (*Dashboard → Users → (user) → Profile → login attempts before lockout*), Jellyfin disables the account, so it is no longer listed. Re-enable it on the same page.
 
@@ -106,7 +108,7 @@ The end-to-end test runs once more with these APIs removed (`OLD_ENGINE=1`).
    - Browsers: press F5.
    - Jellyfin Desktop / Media Player: restart the app.
    - **Android app: swipe it away (or Force stop) and reopen it.** It keeps its page loaded in the background.
-2. **Profiles missing from the picker?** It lists the profiles the sign-in screen shows, plus yourself. Accounts with *Hide this user from login screens* ticked (Jellyfin 12's default for new users) are reached through *Other account*; to list one, untick it in *Dashboard → Users → (user) → Profile*.
+2. **Profiles missing from the picker?** It lists the profiles the sign-in screen shows, plus yourself. Accounts with *Hide this user from login screens* ticked (Jellyfin 12's default for new users) are reached through *Other account*; to list one, untick it on the user's *Profile* tab (*Dashboard → Users*).
 3. **Check the console** (F12 in browsers). `[WhoIsWatching] 1.4.2.0 loaded` confirms the script is there, and a second `[WhoIsWatching]` line says why the avatar was left alone.
 
 ## Compatibility surface
@@ -139,7 +141,7 @@ After a Jellyfin upgrade, run the smoke test (below) to check all of these at on
 - User names, the brand text and the Login Disclaimer are only ever inserted with `textContent`. The brand settings are validated on the server: a `#RRGGBB` colour, 12–120 px, one of three positions, at most 40 characters.
 - Picture gallery (`/WhoIsWatching/Images`):
   - Listing needs a signed-in user. Each picture is served anonymously by its random ID, because an `<img>` can't send a token; Jellyfin serves user pictures the same way.
-  - Adding needs *Allow this user to manage their own preferences*. Only JPEG is accepted (the picker re-encodes every upload to JPEG, which also drops location data from photos), checked by its bytes (a whole JPEG: start and end markers, and a declared size of at most 1024 × 1024 pixels, so a small file can't make every viewer's browser decode a gigantic picture), at most 1 MB each, 20 per person (so one account can't fill it for everyone) and 200 in total. Every profile's browser shows these pictures, so other image formats (WebP's decoder had a remote-code-execution bug, CVE-2023-4863) are refused.
+  - Adding needs Jellyfin's user-preference access (on by default; see *Manage profiles* above). Only JPEG is accepted (the picker re-encodes every upload to JPEG, which also drops location data from photos), checked by its bytes (a whole JPEG: start and end markers, and a declared size of at most 1024 × 1024 pixels, so a small file can't make every viewer's browser decode a gigantic picture), at most 1 MB each, 20 per person (so one account can't fill it for everyone) and 200 in total. Every profile's browser shows these pictures, so other image formats (WebP's decoder had a remote-code-execution bug, CVE-2023-4863) are refused.
   - Files are named by the server (a new GUID), so nothing a client sends becomes a path. They are served with `X-Content-Type-Options: nosniff` and a sandboxing `Content-Security-Policy`.
   - Only administrators can delete.
   - Profile pictures are applied through Jellyfin's own API, so Jellyfin's permission checks decide who may change whose picture.
