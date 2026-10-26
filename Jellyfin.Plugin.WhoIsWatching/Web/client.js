@@ -219,6 +219,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     let bypass = false;
     let closing = false;
     let declined = false; // the sign-in picker was closed before Jellyfin's sign-in page showed
+    let replaced = false; // the picker is closing because another page showed
 
     let preload; // { api, at, data }: profiles requested when the avatar was pressed, for the click that follows
     let early; // { api, at, data }: the sign-in page's data, requested before the page shows (see prefetch)
@@ -247,6 +248,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
                 declined = false; // only the showing it was declined before is left alone
             }
         } else if (e.type === 'viewshow' && isOpen() && !busy) {
+            replaced = true;
             closeDialog();
         }
     };
@@ -755,7 +757,9 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             authPanel.querySelector('.wiw-input').value = '';
             pending = null;
             // Declined before Jellyfin's sign-in page had even shown: it isn't covered when it arrives.
-            declined = !trigger && !onLoginPage();
+            // Closed because another page showed, nobody declined anything.
+            declined = !replaced && !trigger && !onLoginPage();
+            replaced = false;
             // Closed over the sign-in page: focus moves on to Jellyfin's own, for keyboards and remotes.
             const first = !trigger && onLoginPage() && Array.from(document.querySelectorAll('#loginPage button, #loginPage [tabindex="0"]'))
                 .find(el => el.getClientRects().length); // shown: Jellyfin hides its other forms

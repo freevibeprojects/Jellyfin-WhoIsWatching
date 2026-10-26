@@ -211,6 +211,16 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await slow.waitForTimeout(500);
   ok(pickerFirst && !(await slow.$('.wiw[open]')), 'the picker shows before a slow sign-in page, and closed then it stays closed');
   await slow.context().close();
+  // closed because some other page showed first (nobody declined it), it still covers the sign-in page
+  const other = await (await browser.newContext()).newPage();
+  await other.route(/session-login.[0-9a-f]+.chunk.js/, async route => { await new Promise(r => setTimeout(r, 2000)); await route.continue(); });
+  await other.goto(B + '/web/');
+  await other.waitForSelector('.wiw[open] .wiw-grid button', { timeout: 30000 });
+  await other.evaluate(() => document.body.appendChild(document.createElement('div')).dispatchEvent(new Event('viewshow')));
+  const closedByPage = await other.waitForSelector('.wiw:not([open])', { state: 'attached', timeout: 5000 }).then(() => true, () => false);
+  await other.waitForSelector('#loginPage', { state: 'attached', timeout: 30000 });
+  ok(closedByPage && await other.waitForSelector('.wiw[open] .wiw-grid button', { timeout: 10000 }).then(() => true, () => false), 'closed by another page showing, the picker still covers the sign-in page later');
+  await other.context().close();
   const stalled = await (await browser.newContext()).newPage();
   await stalled.route(/Users\/Public/i, () => {}); // never answers
   await stalled.goto(B + '/web/');
