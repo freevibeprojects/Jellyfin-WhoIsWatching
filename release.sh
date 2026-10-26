@@ -22,7 +22,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const [version, zip] = process.argv.slice(2);
 const raw = 'https://raw.githubusercontent.com/freevibeprojects/Jellyfin-WhoIsWatching/main';
-const yaml = fs.readFileSync('build.yaml', 'utf8');
+const yaml = fs.readFileSync('build.yaml', 'utf8').replace(/\r\n/g, '\n'); // a Windows checkout has CRLF
 const field = key => yaml.match(new RegExp(`^${key}: "(.*)"$`, 'm'))[1];
 const block = key => yaml.match(new RegExp(`^${key}: >\\n((?: {2}.*\\n?)+)`, 'm'))[1].split('\n').map(l => l.trim()).filter(Boolean).join(' ');
 const old = fs.existsSync('manifest.json') ? JSON.parse(fs.readFileSync('manifest.json', 'utf8'))[0].versions : [];
