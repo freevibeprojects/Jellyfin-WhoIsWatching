@@ -64,6 +64,8 @@
         galleryFull: 'You can’t add more pictures. Pick one from the gallery, or ask an administrator to remove some.'
     };
 
+    // Chrome 66, Safari 13, Firefox 133: fetch's keepalive (a request that finishes after the page goes).
+    const KEEPALIVE = typeof Request === 'function' && 'keepalive' in Request.prototype;
     const PASSWORDLESS_KEY = 'whoiswatching-passwordless-';
     const REMEMBERED_KEY = 'whoiswatching-remembered-';
     const CARD_COLORS = 5; // the theme's defaultCardBackground1..5, as on Jellyfin's sign-in page
@@ -1095,8 +1097,12 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 
         // The server only replaces tokens of the *same* user on this device, so end the previous
         // profile's session explicitly instead of leaving a live token behind, unless it is remembered.
+        // A keepalive request outlives the reload below, so only engines without keepalive wait for it.
         if (!keepPrevious && previousToken) {
-            await revoke(api, previousToken);
+            const ending = revoke(api, previousToken);
+            if (!KEEPALIVE) {
+                await ending;
+            }
         }
 
         // Full reload, without the old route: nothing the previous profile loaded (cached queries,
