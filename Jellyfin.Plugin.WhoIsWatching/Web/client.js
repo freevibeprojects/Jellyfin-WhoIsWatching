@@ -127,6 +127,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
    can equal its normal one, so keyboard and remote focus also gets a ring. */
 .wiw .wiw-button:focus-visible,.wiw .paper-icon-button-light:focus-visible,.wiw .emby-checkbox:focus-visible+span+.checkboxOutline{box-shadow:0 0 0 calc(.15 * var(--u)) var(--jf-palette-text-primary,#fff)}
 .layout-tv .wiw .emby-checkbox:focus+span+.checkboxOutline{transform:scale(1.2)}
+@media (pointer:coarse){.wiw .wiw-check .emby-checkbox-label{min-height:44px}}
 .wiw button:disabled,.wiw input:disabled{cursor:progress}
 .wiw .wiw-close{position:absolute;top:calc(.75 * var(--u));right:calc(.75 * var(--u));width:2.75em;height:2.75em;margin:0;padding:0;font-size:1.2em}
 .wiw .wiw-icon{width:2em;height:2em;margin:0;padding:0;font-size:1.6em}
@@ -305,6 +306,11 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 
     function usable(api) {
         return hasApi(api) && Boolean(api.getCurrentUserId());
+    }
+
+    // A phone or tablet with no mouse or keyboard pointer (and not Jellyfin's TV layout).
+    function touchOnly() {
+        return Boolean(window.matchMedia) && matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches && !isTv();
     }
 
     // Jellyfin's TV layout: a remote, no file picker.
@@ -622,7 +628,8 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         render(api, users);
         showPick();
         showDialog();
-        (pickPanel.querySelector('[aria-current]') || pickPanel.querySelector('.wiw-grid button')).focus();
+        // Keyboards and remotes start on a profile; on a touch screen that ring would look like a choice made.
+        (touchOnly() ? dialog : pickPanel.querySelector('[aria-current]') || pickPanel.querySelector('.wiw-grid button')).focus();
     }
 
     function render(api, users) {
@@ -712,6 +719,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         dialog.classList.toggle('wiw-nogap', !supportsFlexGap());
         dialog.setAttribute('role', 'dialog');
         dialog.setAttribute('aria-modal', 'true');
+        dialog.tabIndex = -1; // focusable itself, for touch screens (see open)
         dialog.setAttribute('aria-labelledby', 'wiw-title');
         // Static markup only; user-provided values are always set through textContent/attributes.
         dialog.innerHTML = `
@@ -1614,7 +1622,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     // direction, preferring ones on the same row/column.
     function nearest(items, from, key) {
         if (!items.includes(from)) {
-            return items[0];
+            return items.find(el => el.classList.contains('wiw-profile')) || items[0];
         }
 
         // Fields and checkboxes are placed by their label, which spans the row.
