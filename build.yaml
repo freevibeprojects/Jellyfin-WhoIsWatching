@@ -1,7 +1,7 @@
 ---
 name: "Who's Watching"
 guid: "2d627493-2b57-432a-b238-c22aaf9fd609"
-version: "1.6.1.0"
+version: "1.6.2.0"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 overview: "Netflix-style profile switching from the avatar button in Jellyfin Web"
@@ -15,6 +15,8 @@ owner: "freevibeprojects"
 artifacts:
   - "Jellyfin.Plugin.WhoIsWatching.dll"
 changelog: >
+  1.6.2: the gear in the picker opens your account settings inside the picker, preloaded, instead of
+  leaving for the Jellyfin home page.
   Profiles without a password sign in with one tap. Administrators can set the profiles' order, who
   may add gallery pictures, and an idle time after which the picker comes back. New in the picker:
   Sign out, Show password, Remove picture, Remove from gallery for your own uploads, a mark on
