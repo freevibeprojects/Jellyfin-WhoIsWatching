@@ -184,7 +184,10 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.click('.wiw-confirm [data-action=back]');
   ok(await page.isVisible('.wiw-gallery') && !(await page.isVisible('.wiw-confirm')), 'Not yet returns to the pictures');
   await page.click('.wiw-gallery .wiw-tile[data-id]');
+  await page.route(/\/Images\/Primary/, async route => { await new Promise(r => setTimeout(r, 1000)); await route.continue(); });
   await page.click('[data-action=apply]');
+  ok(await page.textContent('[data-action=apply]') === 'Saving…', 'a picture change in progress says so');
+  await page.unroute(/\/Images\/Primary/);
   await page.waitForFunction(() => { const i = document.querySelector('.wiw-grid button[aria-label^="Kid"] img'); return !document.querySelector('.wiw-pick').hidden && i && i.complete && i.naturalWidth > 0; }, null, { timeout: 15000 });
   ok(kept >= 1, 'Kid got a picture from the shared gallery without uploading (' + kept + ' kept)');
   await page.keyboard.press('Escape');

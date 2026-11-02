@@ -64,6 +64,7 @@
         newPicture: 'New',
         notYet: 'Not yet',
         letsDoIt: 'Let’s do it',
+        saving: 'Saving…',
         current: 'current profile',
         failed: 'Couldn’t sign in. Check the password and try again.',
         offline: 'Couldn’t reach the server. Try again.',
@@ -118,7 +119,7 @@
 .wiw-profile[aria-current=true] .wiw-avatar{box-shadow:0 0 0 calc(.3 * var(--u)) var(--wiw-accent,#00a4dc)}
 button.wiw-profile:focus-visible{color:var(--jf-palette-text-primary,#fff)}
 button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u)) var(--jf-palette-text-primary,#fff);transform:scale(1.04)}
-.wiw-busy .wiw-avatar,.wiw[aria-busy=true] .wiw-who .wiw-avatar{animation:wiw-pulse 1s ease-in-out infinite}
+.wiw-busy .wiw-avatar,.wiw[aria-busy=true] .wiw-who .wiw-avatar,.wiw[aria-busy=true] .wiw-new .wiw-avatar{animation:wiw-pulse 1s ease-in-out infinite}
 .wiw-name{display:flex;align-items:center;gap:.3em;max-width:100%;font-size:1.05em;word-break:break-word;overflow-wrap:anywhere}
 .wiw svg{width:1em;height:1em;flex:none;fill:currentColor}
 .wiw-blank{background:var(--jf-palette-background-paper,#202020);color:var(--jf-palette-text-secondary,rgba(255,255,255,.7))}
@@ -1631,8 +1632,9 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         dialog.querySelectorAll('button, input').forEach(el => {
             el.disabled = value;
         });
-        // While a sign-in is under way, the step says so (the profile's picture pulses too).
+        // While a sign-in or a picture change is under way, the step says so (the picture pulses too).
         authPanel.querySelector('[type=submit]').textContent = value ? TEXT.signingIn : TEXT.signIn;
+        confirmPanel.querySelector('[data-action=apply]').textContent = value ? TEXT.saving : TEXT.letsDoIt;
     }
 
     function setError(message) {
