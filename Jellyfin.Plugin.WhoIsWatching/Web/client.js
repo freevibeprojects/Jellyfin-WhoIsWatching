@@ -626,8 +626,9 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         const users = await api.getJSON(api.getUrl('Users/Public'));
         const currentId = api.getCurrentUserId();
         if (currentId && !users.some(u => u.Id === currentId)) {
-            // The signed-in user may be hidden from login screens; still show them as "you".
-            users.unshift(await api.getCurrentUser());
+            // The signed-in user may be hidden from login screens; still show them as "you", last, so the
+            // other profiles keep the places people learned.
+            users.push(await api.getCurrentUser());
         }
 
         return users;

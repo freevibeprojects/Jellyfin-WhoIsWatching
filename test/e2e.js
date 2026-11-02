@@ -499,6 +499,10 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await Promise.all([page.waitForEvent('load'), page.keyboard.press('Enter')]);
   await avatar.waitFor({ timeout: 30000 });
   ok(await me() === 'Hidden', 'switched to an account hidden from the sign-in screen, without signing out');
+  await avatar.click();
+  await page.waitForSelector('.wiw[open] .wiw-grid button');
+  const order = await page.$$eval('.wiw-grid .wiw-name', es => es.map(e => e.textContent).join());
+  ok(order.endsWith('Kid,Hidden,Other account') && order.startsWith('Alice'), 'a signed-in hidden account comes last, so the other profiles keep their places: ' + order);
 
   // signing out of Jellyfin forgets remembered profiles and ends their sessions, even with nothing
   // clicked since the page loaded
