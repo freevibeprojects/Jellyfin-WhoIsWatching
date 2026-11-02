@@ -67,6 +67,7 @@
         currentPicture: 'Current',
         newPicture: 'New',
         notYet: 'Not yet',
+        discard: 'Remove from gallery',
         letsDoIt: 'Let’s do it',
         saving: 'Saving…',
         current: 'current profile',
@@ -257,6 +258,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     let chosen; // the gallery picture about to be applied
     let uploaded = null; // a picture just added and not yet applied
     let noPassword = []; // IDs of listed profiles the server says have no password
+    const removable = new Set(); // gallery pictures this person may remove (added them, or an administrator)
     const buttons = new Map(); // user ID -> profile button
     const colors = new Map(); // user ID -> avatar colour
     const watched = new WeakSet(); // ApiClients whose sign-out is watched
@@ -816,6 +818,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
  <p class="wiw-error" role="alert"></p>
  <div class="wiw-actions">
   <button type="button" class="wiw-button emby-button raised" data-action="back">${TEXT.notYet}</button>
+  <button type="button" class="wiw-button emby-button raised" data-action="discard">${TEXT.discard}</button>
   <button type="button" class="wiw-button emby-button raised button-submit" data-action="apply">${TEXT.letsDoIt}</button>
  </div>
 </section>
@@ -863,6 +866,8 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
                 applyPicture(window.ApiClient);
             } else if (name === 'unset') {
                 removePicture(window.ApiClient);
+            } else if (name === 'discard') {
+                discardPicture(window.ApiClient);
             } else {
                 closeDialog();
                 if (name === 'account') {
@@ -1509,14 +1514,16 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 
     // The shared gallery: + first (adds a picture for everyone), then the pictures, newest first.
     async function loadGallery(api) {
-        let ids = [];
+        let pictures = [];
         try {
-            ids = await api.getJSON(api.getUrl('WhoIsWatching/Images'));
+            pictures = (await api.getJSON(api.getUrl('WhoIsWatching/Images'))).Images;
         } catch (err) {
             setError(TEXT.offline);
         }
 
-        const tiles = ids.map((id, i) => {
+        removable.clear();
+        pictures.filter(picture => picture.CanDelete).forEach(picture => removable.add(picture.Id));
+        const tiles = pictures.map(({ Id: id }, i) => {
             const tile = document.createElement('button');
             tile.type = 'button';
             tile.className = 'wiw-tile cardImageContainer';
@@ -1570,6 +1577,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         chosen = id;
         uploaded = added ? id : null;
         confirmPanel.querySelector('.wiw-added').hidden = !added;
+        confirmPanel.querySelector('[data-action=discard]').hidden = added || !removable.has(id); // Not yet does it
         const picture = document.createElement('span');
         picture.className = 'wiw-avatar cardImageContainer';
         picture.append(galleryImage(api, id));
@@ -1641,18 +1649,41 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             return;
         }
 
-        const api = window.ApiClient;
-        fetch(api.getUrl('WhoIsWatching/Images/' + uploaded), {
-            method: 'DELETE',
-            headers: { Authorization: `MediaBrowser Token="${api.accessToken()}"` },
-            keepalive: true
-        }).catch(err => console.warn('[WhoIsWatching] could not remove a picture', err));
+        deleteFromGallery(window.ApiClient, uploaded).catch(err => console.warn('[WhoIsWatching] could not remove a picture', err));
         const tile = picturesPanel.querySelector(`.wiw-tile[data-id="${uploaded}"]`);
         if (tile) {
             tile.parentNode.remove();
         }
 
         uploaded = null;
+    }
+
+    // Takes a picture this person added (or, for an administrator, any) out of the gallery for good.
+    async function discardPicture(api) {
+        setBusy(true);
+        setError('');
+        try {
+            const response = await deleteFromGallery(api, chosen);
+            if (!response.ok) {
+                throw response;
+            }
+
+            await loadGallery(api);
+            setBusy(false);
+            show(picturesPanel);
+            (picturesPanel.querySelector('.wiw-tile') || picturesPanel.querySelector('[data-action=back]')).focus();
+        } catch (err) {
+            setBusy(false);
+            setError(TEXT.offline);
+        }
+    }
+
+    function deleteFromGallery(api, id) {
+        return fetch(api.getUrl('WhoIsWatching/Images/' + id), {
+            method: 'DELETE',
+            headers: { Authorization: `MediaBrowser Token="${api.accessToken()}"` },
+            keepalive: true
+        });
     }
 
     // Adds a picture to the shared gallery, then offers it for this profile. It is cropped to a centred

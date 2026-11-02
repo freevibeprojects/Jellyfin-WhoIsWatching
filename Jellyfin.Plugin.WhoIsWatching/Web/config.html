@@ -58,7 +58,8 @@
                 }
 
                 function loadGallery() {
-                    ApiClient.getJSON(ApiClient.getUrl('WhoIsWatching/Images')).then(function (ids) {
+                    ApiClient.getJSON(ApiClient.getUrl('WhoIsWatching/Images')).then(function (gallery) {
+                        var ids = gallery.Images.map(function (picture) { return picture.Id; });
                         field('wiwGalleryCount').textContent = ids.length + ' of 200 pictures.';
                         var gallery = field('wiwGallery');
                         gallery.textContent = '';

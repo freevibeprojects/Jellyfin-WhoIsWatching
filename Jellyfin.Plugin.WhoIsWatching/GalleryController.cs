@@ -89,13 +89,15 @@ public sealed partial class GalleryController : ControllerBase
             .ToList();
 
     /// <summary>
-    /// Lists the gallery, newest first.
+    /// Lists the gallery, newest first, with which pictures the caller may remove.
     /// </summary>
-    /// <returns>Picture IDs.</returns>
+    /// <returns>The pictures.</returns>
     [HttpGet("Images")]
     [Authorize]
-    public IEnumerable<string> GetImages()
-        => Pictures().OrderByDescending(System.IO.File.GetLastWriteTimeUtc).Select(path => Path.GetFileNameWithoutExtension(path)!).ToList();
+    public Gallery GetImages()
+        => new(Pictures().OrderByDescending(System.IO.File.GetLastWriteTimeUtc)
+            .Select(path => new GalleryPicture(Path.GetFileNameWithoutExtension(path)!, MayDelete(path)))
+            .ToList());
 
     /// <summary>
     /// Gets a gallery picture. Anonymous like Jellyfin's own user images, since an img tag can't send a
@@ -225,8 +227,7 @@ public sealed partial class GalleryController : ControllerBase
             return NotFound();
         }
 
-        // A picture someone added sits in the folder named after their user ID.
-        if (!User.IsInRole("Administrator") && Path.GetFileName(Path.GetDirectoryName(path)) != CallerId()?.ToString("N"))
+        if (!MayDelete(path))
         {
             return StatusCode(StatusCodes.Status403Forbidden);
         }
@@ -279,6 +280,10 @@ public sealed partial class GalleryController : ControllerBase
         return null;
     }
 
+    // Administrators may remove any picture, others those they added: in the folder named after their user ID.
+    private bool MayDelete(string path)
+        => User.IsInRole("Administrator") || Path.GetFileName(Path.GetDirectoryName(path)) == CallerId()?.ToString("N");
+
     private Guid? CallerId()
         => Guid.TryParse(User.FindFirst("Jellyfin-UserId")?.Value, out var userId) ? userId : null;
 
@@ -291,6 +296,19 @@ public sealed partial class GalleryController : ControllerBase
     [GeneratedRegex("^#[0-9A-Fa-f]{6}$")]
     private static partial Regex ColorPattern();
 }
+
+/// <summary>
+/// A gallery picture.
+/// </summary>
+/// <param name="Id">Picture ID.</param>
+/// <param name="CanDelete">Whether the caller may remove it (administrators, and whoever added it).</param>
+public sealed record GalleryPicture(string Id, bool CanDelete);
+
+/// <summary>
+/// The shared gallery as one person sees it.
+/// </summary>
+/// <param name="Images">The pictures, newest first.</param>
+public sealed record Gallery(IReadOnlyList<GalleryPicture> Images);
 
 /// <summary>
 /// The picker's brand text, and the profiles it signs in without a password step.

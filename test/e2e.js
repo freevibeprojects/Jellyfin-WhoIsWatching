@@ -174,7 +174,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
     await page.waitForSelector('.wiw-confirm:not([hidden]) .wiw-added:not([hidden])', { timeout: 15000 });
     await page.click('.wiw-confirm [data-action=back]');
     await page.waitForTimeout(500);
-    const listed = await (await fetch(B + '/WhoIsWatching/Images', { headers: auth(adminToken) })).json();
+    const listed = (await (await fetch(B + '/WhoIsWatching/Images', { headers: auth(adminToken) })).json()).Images;
     ok(listed.length === galleryBefore && (await page.$$('.wiw-gallery .wiw-tile[data-id]')).length === galleryBefore, 'Not yet after an upload takes the picture out of the gallery again (' + listed.length + ')');
     const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('.wiw-add')]);
     await chooser.setFiles({ name: 'photo.png', mimeType: 'image/png', buffer: photo });
@@ -208,6 +208,14 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.click('.wiw-grid button[aria-label^="Kid"]');
   await page.click('.wiw-pictures [data-action=unset]');
   ok(noPictureNoRemove && await page.waitForFunction(() => !document.querySelector('.wiw-pick').hidden && !document.querySelector('.wiw-grid button[aria-label^="Kid"] img'), null, { timeout: 15000 }).then(() => true, () => false), 'Remove picture takes a profile back to its initial (and is only offered when it has one)');
+  // Remove from gallery, on the confirm step, for a picture this person may remove
+  const spareId = (await (await fetch(B + '/WhoIsWatching/Images', { method: 'POST', headers: { ...auth(adminToken), 'Content-Type': 'image/jpeg' }, body: await page.screenshot({ type: 'jpeg', clip: { x: 0, y: 0, width: 300, height: 300 } }) })).json()).Id;
+  await page.click('.wiw-grid button[aria-label^="Kid"]');
+  await page.click(`.wiw-gallery .wiw-tile[data-id="${spareId}"]`);
+  await page.click('.wiw-confirm [data-action=discard]');
+  await page.waitForSelector('.wiw-pictures:not([hidden])');
+  ok(!(await page.$(`.wiw-gallery .wiw-tile[data-id="${spareId}"]`)) && !(await (await fetch(B + '/WhoIsWatching/Images', { headers: auth(adminToken) })).json()).Images.some(p => p.Id === spareId), 'Remove from gallery takes the picture out of the gallery');
+  await page.click('.wiw-pictures [data-action=back]');
   await page.keyboard.press('Escape');
   ok(await page.textContent('.wiw-pick .wiw-title') === 'Who’s watching?', 'Escape leaves Manage profiles');
   await page.keyboard.press('Escape');
@@ -463,6 +471,8 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   const kidPolicy = (await (await fetch(B + '/Users', { headers: auth(adminToken) })).json()).find(u => u.Name === 'Kid');
   await fetch(B + `/Users/${kidPolicy.Id}/Policy`, { method: 'POST', headers: { ...auth(adminToken), 'Content-Type': 'application/json' }, body: JSON.stringify({ ...kidPolicy.Policy, EnableUserPreferenceAccess: false }) });
   const kidApi = await signIn('Kid', '', 'e2e-kid-api');
+  const bobsView = (await (await fetch(B + '/WhoIsWatching/Images', { headers: auth(bobApi) })).json()).Images;
+  const removableForBob = bobsView.find(p => p.Id === addedId).CanDelete === true && bobsView.find(p => p.Id === adminsId).CanDelete === false;
   const rules = {
     anonymousList: (await fetch(B + '/WhoIsWatching/Images')).status === 401,
     notAnImage: (await post(bobApi, Buffer.from('<svg onload=alert(1)>'))).status === 400,
@@ -480,7 +490,9 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
     userCantDeleteOthers: (await fetch(B + '/WhoIsWatching/Images/' + adminsId, { method: 'DELETE', headers: auth(bobApi) })).status === 403,
     userDeletesOwn: (await fetch(B + '/WhoIsWatching/Images/' + addedId, { method: 'DELETE', headers: auth(bobApi) })).status === 204,
     adminDeletes: (await fetch(B + '/WhoIsWatching/Images/' + adminsId, { method: 'DELETE', headers: auth(adminToken) })).status === 204,
-    noTraversal: (await fetch(B + '/WhoIsWatching/Images/..%2F..%2Fsystem.xml')).status === 404
+    noTraversal: (await fetch(B + '/WhoIsWatching/Images/..%2F..%2Fsystem.xml')).status === 404,
+    // listed earlier, before the deletes above: Bob may remove his own picture, not the administrator's
+    removableFlags: removableForBob
   };
   // one person can't fill the gallery: 20 pictures each (administrators aren't capped)
   const bobsIds = [];
