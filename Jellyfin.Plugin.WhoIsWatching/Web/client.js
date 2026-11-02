@@ -51,7 +51,7 @@
         accountPasswordHint: 'Leave empty if this account has no password.',
         enterName: 'Enter the account’s username.',
         remember: 'Remember on this device',
-        rememberHint: 'Anyone using this device can then open this profile without the password, until someone signs out. Unticked, you are signed out when the browser closes.',
+        rememberHint: 'Anyone using this device can then open this profile without the password, until someone signs out.',
         otherSignIn: 'Other ways to sign in',
         manage: 'Manage profiles',
         done: 'Done',
@@ -84,9 +84,6 @@
     const SWITCH_KEY = 'whoiswatching-switching'; // sessionStorage: who the reload after a sign-in is for
     const REMEMBERED_KEY = 'whoiswatching-remembered-';
     const LAST_KEY = 'whoiswatching-last-'; // [user ID] last signed in from the picker on this device
-    const END_KEY = 'whoiswatching-endonclose-'; // [user ID] signed in without Remember: ends with the browser
-    const OPEN_COOKIE = 'whoiswatching-open=1'; // a session cookie: the browser hasn't been closed since
-    const ALIVE_KEY = 'whoiswatching-alive'; // when a Jellyfin page in this browser last ran (every 30 s)
     const CARD_COLORS = 5; // the theme's defaultCardBackground1..5, as on Jellyfin's sign-in page
     // Material icons (Apache 2.0): close, settings, edit, add, arrow, lock open, sign out, visibility, person.
     const ICON_CLOSE = 'M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z';
@@ -307,9 +304,6 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     // After a sign-in the page reloads, and Jellyfin Web takes a while to start again (seconds on a TV),
     // so until it shows its first page the screen says who is being signed in.
     let cover = showSwitching();
-    endClosedSession();
-    keepAlive();
-    setInterval(keepAlive, 30000); // a background tab's timers may slow to once a minute
 
     const onView = e => {
         if (cover) {
@@ -385,58 +379,6 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         } else {
             keepRemembered = true;
             signOut(api);
-        }
-    }
-
-    // A sign-in made from the picker without Remember lasts until the browser is closed: if Jellyfin's
-    // saved sign-in is such a profile's and the browser was closed, its session is ended and dropped
-    // before Jellyfin uses it (or, if Jellyfin got there first, the page starts again signed out).
-    // Closed means the session cookie has gone, or no Jellyfin page here ran for three minutes: a
-    // browser restoring its last session brings the cookie back, but nothing ran while it was closed.
-    function endClosedSession() {
-        try {
-            const running = Date.now() - Number(localStorage.getItem(ALIVE_KEY)) < 180000;
-            if (running && document.cookie.split('; ').includes(OPEN_COOKIE)) {
-                return;
-            }
-
-            const credentials = JSON.parse(localStorage.getItem('jellyfin_credentials'));
-            let ended = false;
-            for (const server of (credentials && Array.isArray(credentials.Servers) ? credentials.Servers : [])) {
-                const marked = JSON.parse(localStorage.getItem(END_KEY + server.Id));
-                localStorage.removeItem(END_KEY + server.Id);
-                if (Array.isArray(marked) && marked[0] === server.UserId && server.AccessToken) {
-                    if (document.currentScript) {
-                        fetch(new URL('../Sessions/Logout', document.currentScript.src), {
-                            method: 'POST',
-                            headers: { Authorization: `MediaBrowser Token="${server.AccessToken}"` },
-                            credentials: 'omit',
-                            keepalive: true
-                        }).catch(() => {});
-                    }
-
-                    delete server.AccessToken;
-                    delete server.UserId;
-                    ended = true;
-                }
-            }
-
-            if (ended) {
-                localStorage.setItem('jellyfin_credentials', JSON.stringify(credentials));
-                if (hasApi(window.ApiClient) && window.ApiClient.getCurrentUserId()) {
-                    location.reload();
-                }
-            }
-        } catch (err) {
-            // Storage unavailable or unreadable: nothing was noted to end.
-        }
-    }
-
-    function keepAlive() {
-        try {
-            localStorage.setItem(ALIVE_KEY, String(Date.now()));
-        } catch (err) {
-            // Storage unavailable: nothing is noted to end either.
         }
     }
 
@@ -1456,9 +1398,6 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 
         store(api, REMEMBERED_KEY, tokens);
         store(api, LAST_KEY, [userId]);
-        // Without Remember (always for administrators and Other account), this sign-in ends with the browser.
-        store(api, END_KEY, remember && !isAdmin(result.User) ? [] : [userId]);
-        document.cookie = OPEN_COOKIE + '; path=/; SameSite=Strict';
         if (password !== null) {
             rememberPasswordless(api, userId, password === '');
         }
