@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.6.0.0",
+        "changelog": "Profiles without a password sign in with one tap. Administrators can set the profiles' order, who may add gallery pictures, and an idle time after which the picker comes back. New in the picker: Sign out, Show password, Remove picture, Remove from gallery for your own uploads, a mark on profiles remembered on the device, number and letter keys, and P to open it from any page. It starts on the profile last signed in. Without \"Remember on this device\", a sign-in now ends when the browser closes. Lighter: the script is served without comments and pre-compressed (28 KB to 15 KB), and the gallery loads small thumbnails. Fixes: a wrong password stays to correct, long brand texts fit phones, \"Saving…\" while a picture applies, Not yet after an upload removes it, and gallery uploads that hide a huge picture behind a JPEG marker are refused.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/freevibeprojects/Jellyfin-WhoIsWatching/main/releases/who-is-watching_1.6.0.0.zip",
+        "checksum": "39af1b656ed6176f8b676170f1384592",
+        "timestamp": "2026-11-02T20:45:24Z"
+      },
+      {
         "version": "1.5.0.0",
         "changelog": "Other account: sign in to an account hidden from the sign-in screen (such as the administrator's) without signing out first. The sign-in picker now appears before Jellyfin's own page, in the server's Custom CSS from the start, and after signing in the screen says who is being signed in while Jellyfin starts. Opens at once from TV remotes and keyboards, is bigger on TVs, fits big households, and works with high contrast and screen readers. Safer: signing out always forgets remembered profiles, gallery uploads can't declare huge pictures or tie up server memory, and a sign-in can no longer be undone by Jellyfin's start-up.",
         "targetAbi": "12.0.0.0",

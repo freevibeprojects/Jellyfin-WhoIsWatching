@@ -6,7 +6,7 @@ if needed, and you are now that user.
 
 - Jellyfin **12.0+** (built against 12.0.0, tested on 12.3)
 - Server side: one ~120 KB DLL with no dependencies, no background work and no database. A settings page in the dashboard; the shared picture gallery is plain files.
-- Client side: one 80 KB script (about 25 KB compressed), cached after the first load. Signed out, it loads the sign-in page's profiles while Jellyfin Web starts; signed in, it stays idle until the avatar is clicked
+- Client side: one script, served as 62 KB without comments and 15 KB compressed (Brotli), cached after the first load. Signed out, it loads the sign-in page's profiles while Jellyfin Web starts; signed in, it stays idle until the avatar is clicked
 
 **Install:** add `https://raw.githubusercontent.com/freevibeprojects/Jellyfin-WhoIsWatching/main/manifest.json` as a repository in *Dashboard → Plugins → Manage Repositories*, then install **Who's Watching** from *Available*. See [Install](#install).
 
@@ -124,7 +124,7 @@ The end-to-end test runs once more with these APIs removed (`OLD_ENGINE=1`).
    - Jellyfin Desktop / Media Player: restart the app.
    - **Android app: swipe it away (or Force stop) and reopen it.** It keeps its page loaded in the background.
 2. **Profiles missing from the picker?** It lists the profiles the sign-in screen shows, plus yourself. Accounts with *Hide this user from login screens* ticked (Jellyfin 12's default for new users) are reached through *Other account*; to list one, untick it on the user's *Profile* tab (*Dashboard → Users*).
-3. **Check the console** (F12 in browsers). `[WhoIsWatching] 1.5.0.0 loaded` confirms the script is there, and a second `[WhoIsWatching]` line says why the avatar was left alone.
+3. **Check the console** (F12 in browsers). `[WhoIsWatching] 1.6.0.0 loaded` confirms the script is there, and a second `[WhoIsWatching]` line says why the avatar was left alone.
 
 ## Compatibility surface
 
