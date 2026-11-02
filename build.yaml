@@ -1,7 +1,7 @@
 ---
 name: "Who's Watching"
 guid: "2d627493-2b57-432a-b238-c22aaf9fd609"
-version: "1.6.0.0"
+version: "1.6.1.0"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 overview: "Netflix-style profile switching from the avatar button in Jellyfin Web"
@@ -19,8 +19,12 @@ changelog: >
   may add gallery pictures, and an idle time after which the picker comes back. New in the picker:
   Sign out, Show password, Remove picture, Remove from gallery for your own uploads, a mark on
   profiles remembered on the device, number and letter keys, and P to open it from any page. It starts
-  on the profile last signed in. Without "Remember on this device", a sign-in now ends when the
-  browser closes. Lighter: the script is served without comments and pre-compressed (28 KB to 15 KB),
-  and the gallery loads small thumbnails. Fixes: a wrong password stays to correct, long brand texts
-  fit phones, "Saving…" while a picture applies, Not yet after an upload removes it, and gallery
-  uploads that hide a huge picture behind a JPEG marker are refused.
+  on the profile last signed in. Lighter: the script is served without comments and pre-compressed
+  (28 KB to 15 KB), and the gallery loads small thumbnails. 1.6.1 fixes two 1.6.0 problems:
+  thumbnails were made by the server's image decoder, which on some installs can't read images, so
+  tiles silently loaded full pictures; the browser now makes them at upload, and the server never
+  decodes an uploaded image (less CPU, no image-decoder attack surface). And 1.6.0's "signed out
+  when the browser closes" didn't hold: browsers that restore their last session kept people signed
+  in, a false sense of safety on shared computers. It is withdrawn; use Sign out or the idle time. Fixes: a wrong password stays to correct, long brand texts fit phones, "Saving…"
+  while a picture applies, Not yet after an upload removes it, and gallery uploads that hide a huge
+  picture behind a JPEG marker are refused.
