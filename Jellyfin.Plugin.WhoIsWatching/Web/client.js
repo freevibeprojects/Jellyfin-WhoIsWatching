@@ -852,12 +852,12 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             }
 
             const input = authPanel.querySelector('.wiw-input');
-            const password = input.value;
-            input.value = '';
             const user = pending.user || { Name: authPanel.querySelector('.wiw-username').value.trim() };
-            const err = await switchTo(user, password, Boolean(pending.user) && authPanel.querySelector('.wiw-remember').checked);
+            const err = await switchTo(user, input.value, Boolean(pending.user) && authPanel.querySelector('.wiw-remember').checked);
             setError(failure(err));
+            // Kept and selected: typing replaces it, and a slow typist can fix one letter instead.
             input.focus();
+            input.select();
         });
 
         // Other close requests (such as Android's back gesture) also go back a step first, and
