@@ -73,6 +73,8 @@ It works like Netflix:
 2. Picking one opens **Choose a profile picture**, a page with a shared gallery that everyone sees. The **+** tile adds a picture to it. The picture is cropped to a centred square and shrunk to at most 512 px (JPEG) first, because Jellyfin serves profile pictures at their uploaded size.
 3. Picking a picture asks **Change profile picture?** (current → new), with **Let's do it** / **Not yet**.
 
+**Remove picture**, on the same page, takes a profile back to its initial.
+
 The picture is then copied to the profile through Jellyfin's own user-image API, which applies Jellyfin's permission checks.
 
 Each person may add up to 20 pictures (administrators: up to the gallery's 200). Jellyfin's TV layout has no **+** tile, since a remote can't pick a file: pictures added from a phone or computer show up there.

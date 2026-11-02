@@ -58,6 +58,7 @@
         picture: 'change picture',
         choosePicture: 'Choose a profile picture',
         addPicture: 'Add a picture',
+        removePicture: 'Remove picture',
         galleryPicture: 'Picture',
         noPictures: 'No pictures yet.',
         addElsewhere: 'Pictures are added from a phone or computer.',
@@ -803,7 +804,10 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
  <p class="wiw-error" role="alert"></p>
  <ul class="wiw-gallery"></ul>
  <input class="wiw-file" type="file" accept="image/*" hidden>
- <button type="button" class="wiw-button emby-button raised" data-action="back">${TEXT.back}</button>
+ <div class="wiw-actions">
+  <button type="button" class="wiw-button emby-button raised" data-action="back">${TEXT.back}</button>
+  <button type="button" class="wiw-button emby-button raised" data-action="unset">${TEXT.removePicture}</button>
+ </div>
 </section>
 <section class="wiw-panel wiw-confirm" hidden>
  <h1 class="wiw-title" id="wiw-title-confirm">${TEXT.confirmPicture}</h1>
@@ -857,6 +861,8 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
                 file.click();
             } else if (name === 'apply') {
                 applyPicture(window.ApiClient);
+            } else if (name === 'unset') {
+                removePicture(window.ApiClient);
             } else {
                 closeDialog();
                 if (name === 'account') {
@@ -1494,6 +1500,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         editing = user;
         fill(picturesPanel.querySelector('.wiw-for'), profile(api, user, 'div'));
         fill(picturesPanel.querySelector('.wiw-gallery'));
+        picturesPanel.querySelector('[data-action=unset]').hidden = !user.PrimaryImageTag;
         show(picturesPanel);
         setError('');
         await loadGallery(api);
@@ -1592,14 +1599,39 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 
             await api.uploadUserImage(editing.Id, 'Primary', await response.blob());
             uploaded = null;
-            render(api, await loadUsers(api));
-            setBusy(false);
-            showPick();
-            (buttons.get(editing.Id) || pickPanel.querySelector('[data-action=manage]')).focus();
+            await backToProfiles(api);
         } catch (err) {
             setBusy(false);
             setError(TEXT.pictureFailed);
         }
+    }
+
+    // Back to the profile's initial, through Jellyfin's own user-image API and its permission checks.
+    async function removePicture(api) {
+        setBusy(true);
+        setError('');
+        try {
+            const response = await fetch(api.getUrl(`Users/${editing.Id}/Images/Primary`), {
+                method: 'DELETE',
+                headers: { Authorization: `MediaBrowser Token="${api.accessToken()}"` }
+            });
+            if (!response.ok) {
+                throw response;
+            }
+
+            await backToProfiles(api);
+        } catch (err) {
+            setBusy(false);
+            setError(TEXT.offline);
+        }
+    }
+
+    // After a picture change: the profiles again, with the changed one focused.
+    async function backToProfiles(api) {
+        render(api, await loadUsers(api));
+        setBusy(false);
+        showPick();
+        (buttons.get(editing.Id) || pickPanel.querySelector('[data-action=manage]')).focus();
     }
 
     // Backing out after an upload takes the picture out of the gallery again: nobody sees a picture

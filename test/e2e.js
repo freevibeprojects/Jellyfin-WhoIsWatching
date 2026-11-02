@@ -201,6 +201,13 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.unroute(/\/Images\/Primary/);
   await page.waitForFunction(() => { const i = document.querySelector('.wiw-grid button[aria-label^="Kid"] img'); return !document.querySelector('.wiw-pick').hidden && i && i.complete && i.naturalWidth > 0; }, null, { timeout: 15000 });
   ok(kept >= 1, 'Kid got a picture from the shared gallery without uploading (' + kept + ' kept)');
+  await page.click('.wiw-grid button[aria-label^="Alice"]');
+  await page.waitForSelector('.wiw-pictures:not([hidden])');
+  const noPictureNoRemove = await page.$eval('.wiw-pictures [data-action=unset]', b => b.hidden);
+  await page.click('.wiw-pictures [data-action=back]');
+  await page.click('.wiw-grid button[aria-label^="Kid"]');
+  await page.click('.wiw-pictures [data-action=unset]');
+  ok(noPictureNoRemove && await page.waitForFunction(() => !document.querySelector('.wiw-pick').hidden && !document.querySelector('.wiw-grid button[aria-label^="Kid"] img'), null, { timeout: 15000 }).then(() => true, () => false), 'Remove picture takes a profile back to its initial (and is only offered when it has one)');
   await page.keyboard.press('Escape');
   ok(await page.textContent('.wiw-pick .wiw-title') === 'Who’s watching?', 'Escape leaves Manage profiles');
   await page.keyboard.press('Escape');
