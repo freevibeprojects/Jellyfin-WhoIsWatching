@@ -2,9 +2,11 @@
 
 using System;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Jellyfin.Plugin.WhoIsWatching;
@@ -19,6 +21,9 @@ public sealed class ClientScriptController : ControllerBase
 {
     private static readonly byte[] Script = ReadScript();
 
+    // Compressed once at the smallest size, rather than per request at the fastest level.
+    private static readonly byte[] BrotliScript = Brotli(Script);
+
     /// <summary>
     /// Gets the client script.
     /// </summary>
@@ -29,6 +34,13 @@ public sealed class ClientScriptController : ControllerBase
     {
         // The injected URL carries the plugin version, so a cached copy is never stale.
         Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+        Response.Headers.Vary = "Accept-Encoding";
+        if (Request.GetTypedHeaders().AcceptEncoding.Any(e => e.Value == "br" && (e.Quality ?? 1) > 0))
+        {
+            Response.Headers.ContentEncoding = "br"; // Jellyfin's compression leaves an encoded response alone
+            return File(BrotliScript, "text/javascript; charset=utf-8");
+        }
+
         return File(Script, "text/javascript; charset=utf-8");
     }
 
@@ -41,5 +53,16 @@ public sealed class ClientScriptController : ControllerBase
         using var reader = new StreamReader(stream);
         var lines = reader.ReadToEnd().ReplaceLineEndings("\n").Split('\n').Select(line => line.TrimStart());
         return Encoding.UTF8.GetBytes(string.Join('\n', lines.Take(1).Concat(lines.Skip(1).Where(line => line.Length > 0 && !line.StartsWith("//", StringComparison.Ordinal)))));
+    }
+
+    private static byte[] Brotli(byte[] data)
+    {
+        using var output = new MemoryStream();
+        using (var brotli = new BrotliStream(output, CompressionLevel.SmallestSize))
+        {
+            brotli.Write(data);
+        }
+
+        return output.ToArray();
     }
 }
