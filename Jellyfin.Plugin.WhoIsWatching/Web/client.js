@@ -1624,7 +1624,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             tile.className = 'wiw-tile cardImageContainer';
             tile.dataset.id = id;
             tile.setAttribute('aria-label', `${TEXT.galleryPicture} ${i + 1}`);
-            tile.append(galleryImage(api, id));
+            tile.append(galleryImage(api, id, true));
             tile.addEventListener('click', () => choose(api, id));
             return tile;
         });
@@ -1653,12 +1653,13 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         fill(picturesPanel.querySelector('.wiw-gallery'), ...items);
     }
 
-    function galleryImage(api, id) {
+    // thumb: the gallery's tiles load a small copy; the confirm step the picture itself.
+    function galleryImage(api, id, thumb) {
         const img = document.createElement('img');
         img.alt = '';
         img.loading = 'lazy';
         img.decoding = 'async';
-        img.src = api.getUrl('WhoIsWatching/Images/' + id);
+        img.src = api.getUrl('WhoIsWatching/Images/' + id, thumb ? { thumb: true } : undefined);
         return img;
     }
 

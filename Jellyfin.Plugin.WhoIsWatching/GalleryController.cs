@@ -10,7 +10,9 @@ using System.Threading.Tasks;
 using Jellyfin.Data;
 using Jellyfin.Database.Implementations.Enums;
 using MediaBrowser.Common.Configuration;
+using MediaBrowser.Controller.Drawing;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Model.Drawing;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -40,6 +42,9 @@ public sealed partial class GalleryController : ControllerBase
     // declared size is checked too.
     private const int MaxImageSide = 1024;
 
+    // The gallery's tiles are at most ~230 px on a 1080p screen at 2x, so they load a copy this size.
+    private const int ThumbnailSide = 256;
+
     // Jellyfin's own password provider; an account another provider handles (LDAP, SSO) has its password elsewhere.
     private const string DefaultAuthenticationProvider = "Jellyfin.Server.Implementations.Users.DefaultAuthenticationProvider";
 
@@ -47,17 +52,22 @@ public sealed partial class GalleryController : ControllerBase
     private static readonly SemaphoreSlim AddLock = new(1, 1);
 
     private readonly IUserManager _userManager;
+    private readonly IImageEncoder _imageEncoder;
     private readonly string _folder;
+    private readonly string _thumbnails;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="GalleryController"/> class.
     /// </summary>
     /// <param name="userManager">User manager.</param>
     /// <param name="applicationPaths">Application paths.</param>
-    public GalleryController(IUserManager userManager, IApplicationPaths applicationPaths)
+    /// <param name="imageEncoder">Jellyfin's image encoder, for thumbnails.</param>
+    public GalleryController(IUserManager userManager, IApplicationPaths applicationPaths, IImageEncoder imageEncoder)
     {
         _userManager = userManager;
+        _imageEncoder = imageEncoder;
         _folder = Path.Combine(applicationPaths.PluginConfigurationsPath, "WhoIsWatching", "images");
+        _thumbnails = Path.Combine(applicationPaths.CachePath, "WhoIsWatching");
     }
 
     /// <summary>
@@ -118,15 +128,21 @@ public sealed partial class GalleryController : ControllerBase
     /// token; IDs are random GUIDs and the list itself needs a signed-in user.
     /// </summary>
     /// <param name="id">Picture ID.</param>
+    /// <param name="thumb">A small copy for the gallery's tiles.</param>
     /// <returns>The picture.</returns>
     [HttpGet("Images/{id:guid}")]
     [AllowAnonymous]
-    public ActionResult GetImage(Guid id)
+    public ActionResult GetImage(Guid id, [FromQuery] bool thumb = false)
     {
         var path = Find(id);
         if (path is null)
         {
             return NotFound();
+        }
+
+        if (thumb)
+        {
+            path = Thumbnail(path);
         }
 
         // A picture never changes under its ID. nosniff and the sandbox keep a crafted file from
@@ -247,7 +263,43 @@ public sealed partial class GalleryController : ControllerBase
         }
 
         System.IO.File.Delete(path);
+        var thumbnail = Path.Combine(_thumbnails, Path.GetFileName(path));
+        if (System.IO.File.Exists(thumbnail)) // File.Delete throws if the cache folder isn't there yet
+        {
+            System.IO.File.Delete(thumbnail);
+        }
         return NoContent();
+    }
+
+    // A 256 px copy, made once by Jellyfin's own image encoder into Jellyfin's cache (which may clear it).
+    // If it can't be made (no encoder on this server, or it fails), the picture itself.
+    private string Thumbnail(string path)
+    {
+        var thumbnail = Path.Combine(_thumbnails, Path.GetFileName(path));
+        if (System.IO.File.Exists(thumbnail))
+        {
+            return thumbnail;
+        }
+
+        var partial = thumbnail + "." + Guid.NewGuid().ToString("N"); // two first requests can't collide
+        try
+        {
+            Directory.CreateDirectory(_thumbnails);
+            var options = new ImageProcessingOptions { MaxWidth = ThumbnailSide, MaxHeight = ThumbnailSide, Quality = 85, SupportedOutputFormats = [ImageFormat.Jpg] };
+            var made = _imageEncoder.EncodeImage(path, System.IO.File.GetLastWriteTimeUtc(path), partial, false, null, 85, options, ImageFormat.Jpg);
+            if (made != partial)
+            {
+                return path; // already small enough: the encoder kept the original
+            }
+
+            System.IO.File.Move(partial, thumbnail, true);
+            return thumbnail;
+        }
+        catch (Exception)
+        {
+            System.IO.File.Delete(partial);
+            return path;
+        }
     }
 
     // The ID is a parsed GUID, so the name can't leave the folder. Pictures from before 1.4 sit at the top.

@@ -80,7 +80,7 @@
                             var img = document.createElement('img');
                             img.alt = '';
                             img.loading = 'lazy';
-                            img.src = ApiClient.getUrl('WhoIsWatching/Images/' + id);
+                            img.src = ApiClient.getUrl('WhoIsWatching/Images/' + id, { thumb: true });
                             img.className = 'cardImageContainer'; // only as round as the theme makes Jellyfin's cards
                             img.style.cssText = 'width:7em;height:7em;object-fit:cover';
                             var remove = document.createElement('button');

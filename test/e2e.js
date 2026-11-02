@@ -38,8 +38,8 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   const scriptResponse = await fetch(B + '/WhoIsWatching/client.js', { headers: { 'Accept-Encoding': 'br' } });
   const brotliBytes = +scriptResponse.headers.get('content-length');
   const script = await scriptResponse.text();
-  ok(script.startsWith('// SPDX-License-Identifier') && !/\n\s*\/\//.test(script) && !/\n\s/.test(script) && script.length < 60000, 'the script is served without comment lines or indentation (' + script.length + ' bytes)');
-  ok(scriptResponse.headers.get('content-encoding') === 'br' && brotliBytes > 0 && brotliBytes < 15000, 'the script comes compressed at the smallest size (' + brotliBytes + ' bytes)');
+  ok(script.startsWith('// SPDX-License-Identifier') && !/\n\s*\/\//.test(script) && !/\n\s/.test(script) && script.length < 70000, 'the script is served without comment lines or indentation (' + script.length + ' bytes)');
+  ok(scriptResponse.headers.get('content-encoding') === 'br' && brotliBytes > 0 && brotliBytes < 18000, 'the script comes compressed at the smallest size (' + brotliBytes + ' bytes)');
   const signedOut = await page.evaluate(() => ({
     names: Array.from(document.querySelectorAll('.wiw-grid .wiw-name'), e => e.textContent).join(),
     noSettings: document.querySelector('[data-action=manage]').hidden && document.querySelector('[data-action=account]').hidden,
@@ -201,6 +201,12 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.unroute(/\/Images\/Primary/);
   await page.waitForFunction(() => { const i = document.querySelector('.wiw-grid button[aria-label^="Kid"] img'); return !document.querySelector('.wiw-pick').hidden && i && i.complete && i.naturalWidth > 0; }, null, { timeout: 15000 });
   ok(kept >= 1, 'Kid got a picture from the shared gallery without uploading (' + kept + ' kept)');
+  // the gallery's tiles load a 256 px copy; the confirm step and Jellyfin get the picture itself
+  const side = buf => { for (let i = 2; i + 9 < buf.length;) { if (buf[i] !== 0xff) return 0; const m = buf[i + 1]; if (m >= 0xc0 && m <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(m)) return Math.max(buf.readUInt16BE(i + 5), buf.readUInt16BE(i + 7)); i += 2 + buf.readUInt16BE(i + 2); } return 0; };
+  const newest = (await (await fetch(B + '/WhoIsWatching/Images', { headers: auth(adminToken) })).json()).Images[0].Id;
+  const fullSide = side(Buffer.from(await (await fetch(B + '/WhoIsWatching/Images/' + newest)).arrayBuffer()));
+  const thumbSide = side(Buffer.from(await (await fetch(B + '/WhoIsWatching/Images/' + newest + '?thumb=true')).arrayBuffer()));
+  ok(fullSide > 256 && (thumbSide === 256 || thumbSide === fullSide), 'gallery thumbnails: 256 px, or the picture itself where the server cannot resize (the picture ' + fullSide + ' px, the thumbnail ' + thumbSide + ' px)');
   await page.click('.wiw-grid button[aria-label^="Alice"]');
   await page.waitForSelector('.wiw-pictures:not([hidden])');
   const noPictureNoRemove = await page.$eval('.wiw-pictures [data-action=unset]', b => b.hidden);

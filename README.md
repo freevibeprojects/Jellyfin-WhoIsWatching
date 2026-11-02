@@ -78,6 +78,8 @@ It works like Netflix:
 
 The picture is then copied to the profile through Jellyfin's own user-image API, which applies Jellyfin's permission checks.
 
+The gallery's tiles load 256 px copies, made once by Jellyfin's own image encoder and kept in Jellyfin's cache; the *Change profile picture?* step and the profile itself get the full picture.
+
 Each person may add up to 20 pictures (administrators: up to the gallery's 200). On the plugin's dashboard page, administrators can untick people under *Who may add pictures*: they can still pick from the gallery, but not add to it. Jellyfin's TV layout has no **+** tile, since a remote can't pick a file: pictures added from a phone or computer show up there.
 
 The gallery is kept on the server in `<data dir>/plugins/configurations/WhoIsWatching/images/`, one folder per person who added pictures, so it survives plugin updates. Administrators remove pictures in the plugin's dashboard page. People remove pictures they added with **Remove from gallery** on the *Change profile picture?* step (administrators can remove any there), and *Not yet* right after adding one takes it out again. Removing one doesn't change anyone's current picture.
