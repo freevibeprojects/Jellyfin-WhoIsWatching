@@ -17,7 +17,7 @@ if needed, and you are now that user.
 | `ScriptInjection.cs` | An ASP.NET Core `IStartupFilter`, registered through Jellyfin's `IPluginServiceRegistrator`. When `…/web/` or `…/web/index.html` is served, it appends `<script async src="../WhoIsWatching/client.js?v=…">`. Nothing is written to disk, so read-only installs (Docker, distro packages) work. Every other request costs one string comparison. |
 | `ClientScriptController.cs` | Serves the embedded script (`GET /WhoIsWatching/client.js`) anonymously. It is static and holds no data. |
 | `GalleryController.cs` | The brand-text settings (`GET /WhoIsWatching/Settings`, anonymous, because the sign-in page shows the brand text) and the shared picture gallery (`/WhoIsWatching/Images`). See *Profile pictures*. |
-| `Web/client.js` | Covers Jellyfin's sign-in page with the picker, and intercepts clicks on the avatar button to show it. It switches users with Jellyfin's own client API, then reloads the page. *Manage profiles* changes pictures; the gear runs the avatar button's normal action (settings or user menu). |
+| `Web/client.js` | Covers Jellyfin's sign-in page with the picker, and intercepts clicks on the avatar button to show it. It switches users with Jellyfin's own client API, then reloads the page. *Manage profiles* changes pictures; the gear runs the avatar button's normal action (settings or user menu), and the sign-out button signs out of Jellyfin (which also forgets remembered profiles). |
 | `Web/config.html` | The plugin's page in *Dashboard → Plugins*: brand text, and removing gallery pictures. |
 
 The switch uses only what the login page uses:

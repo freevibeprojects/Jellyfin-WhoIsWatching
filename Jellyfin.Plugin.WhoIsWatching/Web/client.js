@@ -36,6 +36,7 @@
     const TEXT = {
         title: 'Who’s watching?',
         account: 'Account settings',
+        signOut: 'Sign out',
         close: 'Close',
         password: 'Password',
         username: 'Username',
@@ -80,13 +81,14 @@
     const REMEMBERED_KEY = 'whoiswatching-remembered-';
     const LAST_KEY = 'whoiswatching-last-'; // [user ID] last signed in from the picker on this device
     const CARD_COLORS = 5; // the theme's defaultCardBackground1..5, as on Jellyfin's sign-in page
-    // Material icons (Apache 2.0): close, settings, edit, add, arrow, lock open, person.
+    // Material icons (Apache 2.0): close, settings, edit, add, arrow, lock open, sign out, person.
     const ICON_CLOSE = 'M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z';
     const ICON_SETTINGS = 'M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z';
     const ICON_EDIT = 'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z';
     const ICON_ADD = 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z';
     const ICON_ARROW = 'M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z';
     const ICON_OPEN = 'M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-9h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h1.9c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm0 12H6V10h12v10z';
+    const ICON_SIGN_OUT = 'M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z';
     const ICON_PERSON = 'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z';
 
     // Everything scales with --u: 16px at 1080p, growing with the screen (21px at 1440p, 32px at 4K),
@@ -691,6 +693,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         manage.textContent = managing ? TEXT.done : TEXT.manage;
         manage.hidden = !users.some(user => canEdit(api, user));
         pickPanel.querySelector('[data-action=account]').hidden = managing || !currentId;
+        pickPanel.querySelector('[data-action=signout]').hidden = managing || !currentId;
         pickPanel.querySelector('.wiw-other').hidden = Boolean(currentId);
         // A big household: smaller tiles, so everyone and the buttons below fit on one screen.
         dialog.classList.toggle('wiw-crowded', users.length + 1 > 10);
@@ -767,6 +770,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
   <button type="button" class="wiw-button emby-button raised" data-action="manage">${TEXT.manage}</button>
   <button type="button" class="wiw-button emby-button raised wiw-other" data-action="close">${TEXT.otherSignIn}</button>
   <button type="button" class="wiw-icon paper-icon-button-light" data-action="account" title="${TEXT.account}">${icon(ICON_SETTINGS)}</button>
+  <button type="button" class="wiw-icon paper-icon-button-light" data-action="signout" title="${TEXT.signOut}">${icon(ICON_SIGN_OUT)}</button>
  </div>
 </section>
 <section class="wiw-panel wiw-pictures" hidden>
@@ -831,6 +835,8 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
                 closeDialog();
                 if (name === 'account') {
                     passThrough();
+                } else if (name === 'signout') {
+                    signOut(window.ApiClient);
                 }
             }
         });
@@ -1210,6 +1216,15 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 
             return logout.apply(this, args);
         };
+    }
+
+    // Jellyfin's own sign-out (its menu's Sign Out), which also forgets remembered profiles (watchSignOut).
+    function signOut(api) {
+        if (window.Dashboard && typeof window.Dashboard.logout === 'function') {
+            window.Dashboard.logout();
+        } else {
+            api.logout().then(() => location.reload());
+        }
     }
 
     function revoke(api, token) {

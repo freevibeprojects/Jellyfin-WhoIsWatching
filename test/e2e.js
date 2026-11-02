@@ -101,7 +101,9 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.keyboard.press('ArrowRight');
   ok(await page.evaluate(() => document.activeElement.dataset.action) === 'account', 'ArrowRight moves to the gear (Account settings)');
   await page.keyboard.press('ArrowRight');
-  ok(await page.evaluate(() => document.activeElement.dataset.action) === 'account', 'ArrowRight from the gear stays on its row');
+  ok(await page.evaluate(() => document.activeElement.dataset.action) === 'signout', 'ArrowRight from the gear moves to Sign out');
+  await page.keyboard.press('ArrowRight');
+  ok(await page.evaluate(() => document.activeElement.dataset.action) === 'signout', 'ArrowRight from Sign out stays on its row');
   await page.keyboard.press('ArrowUp');
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('ArrowDown');
@@ -113,7 +115,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   ok(contrast.focus !== 'none' && contrast.tile !== 'none', 'high contrast: the focused control has an outline, the tiles a border ' + JSON.stringify(contrast));
   ok(await page.$eval('[data-action=account]', b => b.title === 'Account settings' && !b.hasAttribute('aria-label') && !!b.querySelector('svg')), 'Account settings is a gear icon');
   // Tab never leaves the picker (the old engines' stand-in has no modal focus loop of its own)
-  await page.focus('.wiw [data-action=account]');
+  await page.focus('.wiw [data-action=signout]');
   await page.keyboard.press('Tab');
   ok(await page.evaluate(() => document.querySelector('.wiw').contains(document.activeElement)), 'Tab past the last control stays in the picker');
   await page.keyboard.press('Escape');
@@ -548,5 +550,13 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.waitForSelector('.wiw[open] .wiw-grid button', { timeout: 30000 });
   ok(await profilesAhead(signOutAt), 'after signing out, the picker’s profiles were requested before the sign-in page showed');
   ok(await page.evaluate(() => document.activeElement.getAttribute('aria-label')) === 'Kid', 'the sign-in picker starts on the profile last signed in here');
+  ok(await page.$eval('[data-action=signout]', b => b.hidden), 'no Sign out button when nobody is signed in');
+  // the picker's own Sign out button: Jellyfin's sign-out, back to the sign-in picker
+  await Promise.all([page.waitForEvent('load'), page.click('.wiw-grid button[aria-label="Kid"]')]);
+  await avatar.waitFor({ timeout: 30000 });
+  await avatar.click();
+  await page.click('[data-action=signout]');
+  await page.waitForSelector('.wiw[open] .wiw-grid button', { timeout: 30000 });
+  ok(await page.evaluate(() => !window.ApiClient.getCurrentUserId()), 'Sign out in the picker signs out, and the sign-in picker shows');
   await browser.close();
 })().catch(e => { console.log('FAIL exception ' + e.message); process.exit(1); });
