@@ -345,6 +345,25 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   ok(stillIn && await idle.waitForSelector('.wiw[open] .wiw-grid button', { timeout: 30000 }).then(() => true, () => false) && await idle.evaluate(() => !window.ApiClient.getCurrentUserId()), 'idle past the administrator\'s minutes: signed out, back to the sign-in picker');
   await idle.context().close();
   await config(defaults);
+  // a sign-in without Remember lasts the browser session (its session cookie) and ends once it is closed
+  const session = await browser.newContext();
+  const first = await session.newPage();
+  await first.goto(B + '/web/');
+  await first.waitForSelector('.wiw[open] .wiw-grid button', { timeout: 30000 });
+  await Promise.all([first.waitForEvent('load', { timeout: 30000 }), first.click('.wiw-grid button[aria-label="Kid"]')]);
+  await first.waitForFunction(() => window.ApiClient && window.ApiClient.getCurrentUserId(), null, { timeout: 30000 });
+  const closedToken = await first.evaluate(() => window.ApiClient.accessToken());
+  const state = await session.storageState();
+  await session.close();
+  const sameSession = await (await browser.newContext({ storageState: state })).newPage();
+  await sameSession.goto(B + '/web/');
+  const keptOpen = await sameSession.waitForFunction(() => window.ApiClient && window.ApiClient.getCurrentUserId(), null, { timeout: 30000 }).then(() => true, () => false);
+  await sameSession.context().close();
+  const reopened = await (await browser.newContext({ storageState: { ...state, cookies: [] } })).newPage();
+  await reopened.goto(B + '/web/');
+  const signedOutAgain = await reopened.waitForSelector('.wiw[open] .wiw-grid button', { timeout: 30000 }).then(() => true, () => false);
+  ok(keptOpen && signedOutAgain && (await fetch(B + '/Users/Me', { headers: auth(closedToken) })).status === 401, 'a sign-in without Remember lasts the browser session and ends once the browser is closed');
+  await reopened.context().close();
   let themedPage = await customCss('');
   const themed = await radius(themedPage);
   await themedPage.context().close();

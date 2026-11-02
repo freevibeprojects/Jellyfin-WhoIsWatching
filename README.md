@@ -27,7 +27,7 @@ The switch uses only what the login page uses:
 3. The previous user's token is revoked with `POST /Sessions/Logout`. This is needed because Jellyfin only replaces tokens of the *same* user on a device, so without it the old token would stay valid.
 4. The page fully reloads to the home screen (saying "Signing in as …" until Jellyfin Web has started again, which takes seconds on a TV). Many of jellyfin-web's query-cache keys don't include the user ID, so switching without a reload could show the previous profile's cached rows (for example, an adult's suggestions on a child's profile).
 
-There is no new authentication endpoint, session store, cookie or cryptography. The plugin's own endpoints only serve its script, its settings and the picture gallery.
+There is no new authentication endpoint, session store or cryptography. The only cookie is `whoiswatching-open`, a session cookie with no data that tells a sign-in without *Remember on this device* that the browser hasn't been closed. The plugin's own endpoints only serve its script, its settings and the picture gallery.
 
 ### The sign-in page
 
@@ -47,6 +47,7 @@ Jellyfin 12 never tells clients whether a user has a password: `UserDto.HasPassw
 - After a profile signs in with a blank password once, this browser remembers its **user ID** (in `localStorage`, per server) and switches to it in one click next time. If a password is added later, the one-click attempt fails once and the password step appears.
 - **Remember on this device** (in the password step) keeps that profile signed in on this browser, so it opens in one click, like Jellyfin's own *Remember me*. What is kept is the profile's Jellyfin access token, never the password. Switching away from a remembered profile leaves its session running instead of ending it.
   - Remembered profiles carry an open-lock mark in the picker, so whoever hands the device over can see which profiles open without a password.
+  - Without it, the sign-in ends when the browser is closed: the next time Jellyfin Web opens, its session is ended and the picker shows. (A browser set to restore its last session keeps it, as it keeps that session's cookies.) Administrators and *Other account* sign-ins always end this way.
   - **Administrator accounts can never be remembered.** They always ask for the password, so a child on a shared TV can't one-click into the account that controls parental settings.
   - A remembered profile is forgotten, and asks for its password again, when its password is changed, its session is ended (for example from *Dashboard → Devices*), or anyone signs out of Jellyfin in this browser. Signing out also ends every remembered profile's session.
   - The server still applies the profile's rules (disabled account, access schedule, remote access) every time it is used.
