@@ -245,8 +245,10 @@ public sealed partial class GalleryController : ControllerBase
                 return ((jpeg[i + 7] << 8) | jpeg[i + 8], (jpeg[i + 5] << 8) | jpeg[i + 6]);
             }
 
+            // Markers without a length (FF00, TEM, RSTn, SOI, EOI) are skipped differently by decoders, which
+            // would then find a frame header this walk jumped over; a canvas never writes them before the frame.
             var segment = (jpeg[i + 2] << 8) | jpeg[i + 3];
-            if (marker == 0xDA || segment < 2)
+            if (marker is 0xDA or 0x00 or 0x01 or (>= 0xD0 and <= 0xD9) || segment < 2)
             {
                 return null; // image data before any frame header, or a broken segment
             }

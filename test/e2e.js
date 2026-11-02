@@ -413,6 +413,8 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
     notWholeJpeg:(await post(bobApi, Buffer.from('ÿØÿà<html>', 'latin1'))).status === 400,
     noFrameHeader: (await post(bobApi, Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(100), Buffer.from([0xff, 0xd9])]))).status === 400,
     decompressionBomb: (await post(bobApi, jpegOf(16000, 16000))).status === 400 && (await post(bobApi, jpegOf(512, 1025))).status === 400,
+    // a huge frame header after a marker without a length (TEM), where a decoder finds it and a length-based walk skips it
+    hiddenFrame: (await post(bobApi, Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0x01, 0, 15, 0xff, 0xc0, 0, 11, 8, 0x3e, 0x80, 0x3e, 0x80, 1, 1, 0x11, 0]), jpegOf(512, 512).subarray(2)]))).status === 400,
     pngRefused: (await post(bobApi, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0]))).status === 400,
     tooBig: (await post(bobApi, Buffer.alloc(1024 * 1024 + 1, 0xff))).status === 413,
     added: added.status === 200,
