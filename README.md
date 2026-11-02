@@ -52,6 +52,10 @@ Jellyfin 12 never tells clients whether a user has a password: `UserDto.HasPassw
   - Accounts signed in to through *Other account* aren't offered it: they aren't listed, so there is no profile to open in one click.
 - Signing in from the picker always keeps the session across reloads, like Jellyfin's own *Remember me* (its default). The picker reloads the page after every sign-in, so it turns that setting back on if it was unticked earlier in this browser; otherwise the reload would land on the sign-in page again.
 
+### Keyboard and remote
+
+Arrow keys and a remote's OK and Back move around the picker. On the profiles, 1–9 go to that profile and a letter to the next profile whose name starts with it.
+
 ### Look
 
 The picker scales with the screen: the same proportions on a phone, at 1080p, on a 1440p (2K) monitor and at 4K, limited by height on wide or short windows. Older engines without `clamp()` keep the 1080p sizes.

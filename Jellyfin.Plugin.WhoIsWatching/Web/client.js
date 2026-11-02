@@ -1717,6 +1717,21 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             return;
         }
 
+        // On the profiles, 1-9 go to that profile and a letter to the next profile starting with it.
+        if (!pickPanel.hidden && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey && !e.target.classList.contains('emby-input')) {
+            const tiles = Array.from(pickPanel.querySelectorAll('.wiw-grid li:not([hidden]) button'));
+            const key = e.key.toLowerCase();
+            const from = tiles.indexOf(document.activeElement);
+            const target = /^[1-9]$/.test(key) ? tiles[key - 1]
+                : tiles.slice(from + 1).concat(tiles.slice(0, from + 1)).find(tile => tile.querySelector('.wiw-name').textContent.trim().toLowerCase().startsWith(key));
+            if (target) {
+                e.preventDefault();
+                target.focus();
+            }
+
+            return;
+        }
+
         // TV remotes' OK key is Enter, which would submit the form instead of ticking the box.
         if (e.key === 'Enter' && e.target.classList.contains('wiw-remember')
             && isTv()) {

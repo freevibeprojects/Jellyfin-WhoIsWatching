@@ -92,6 +92,12 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   const names = await page.$$eval('.wiw-grid .wiw-name', els => els.map(e => e.textContent));
   ok(JSON.stringify(names) === '["Alice","Bob","Kid","Other account"]', 'grid shows public users only, then Other account: ' + names);
   ok(await page.evaluate(() => document.activeElement.getAttribute('aria-label')) === 'Alice, current profile', 'focus starts on current profile');
+  await page.keyboard.press('3');
+  const byNumber = await page.evaluate(() => document.activeElement.getAttribute('aria-label'));
+  await page.keyboard.press('b');
+  const byLetter = await page.evaluate(() => document.activeElement.getAttribute('aria-label'));
+  await page.keyboard.press('a');
+  ok(byNumber === 'Kid' && byLetter === 'Bob' && await page.evaluate(() => document.activeElement.getAttribute('aria-label')) === 'Alice, current profile', 'a number or a first letter jumps to that profile: ' + [byNumber, byLetter]);
   await page.waitForTimeout(400); await page.screenshot({ path: out + '/' + (layout || 'default') + '-1-grid.png' });
   ok(await page.waitForFunction(() => { const i = document.querySelector('.wiw-grid button[aria-label="Bob"] img'); return i && i.complete && i.naturalWidth > 0; }, null, { timeout: 5000 }).then(() => true, () => false), 'profile avatar image loads');
   await page.keyboard.press('ArrowRight');
