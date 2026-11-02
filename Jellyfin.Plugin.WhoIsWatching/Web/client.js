@@ -28,6 +28,10 @@
 // When any of it is missing, the avatar button keeps its normal behaviour.
 (() => {
     'use strict';
+    // The settings page loads inside the picker's iframe: no second picker in there.
+    if (window.top !== window.self) {
+        return;
+    }
 
     // The classic header's user button, and the newer (MUI) app bar's user menu button.
     const AVATAR_SELECTOR = '.headerUserButton, [aria-controls="app-user-menu"]';
@@ -37,6 +41,7 @@
     const TEXT = {
         title: 'Who’s watching?',
         account: 'Account settings',
+        loading: 'Loading settings…',
         signOut: 'Sign out',
         close: 'Close',
         password: 'Password',
@@ -116,6 +121,8 @@
 .wiw::backdrop{background:var(--jf-palette-background-default,#101010)}
 .wiw[aria-busy=true]{cursor:progress}
 .wiw.wiw-instant{animation:none}
+.wiw-settings{width:min(100%,60em);height:90vh}
+.wiw-frame{flex:1;width:100%;min-height:0;border:0;border-radius:.4em;background:#101010}
 .wiw-panel{margin:auto;display:flex;flex-direction:column;align-items:center;gap:2em;text-align:center;max-width:64em}
 .wiw-title{margin:0;font-size:3em;font-weight:500}
 .wiw-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:calc(2 * var(--u));margin:0;padding:0;list-style:none}
@@ -268,6 +275,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     let opening = false;
     let busy = false;
     let bypass = false;
+    let settingsPanel;
     let closing = false;
     let declined = false; // the sign-in picker was closed before Jellyfin's sign-in page showed
     let replaced = false; // the picker is closing because another page showed
@@ -710,6 +718,10 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             build();
         }
 
+        if (api.getCurrentUserId()) {
+            setTimeout(loadSettings, 1500); // warm the settings page while the picker is looked at
+        }
+
         managing = false;
         noPassword = settings && Array.isArray(settings.Passwordless) ? settings.Passwordless : [];
         order = settings && Array.isArray(settings.Order) ? settings.Order : [];
@@ -867,6 +879,14 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
   <button type="button" class="wiw-button emby-button raised button-submit" data-action="apply">${TEXT.letsDoIt}</button>
  </div>
 </section>
+<section class="wiw-panel wiw-settings" hidden>
+ <h1 class="wiw-title" id="wiw-title-settings">${TEXT.account}</h1>
+ <p class="wiw-hint wiw-loading" role="status">${TEXT.loading}</p>
+ <iframe class="wiw-frame" title="${TEXT.account}" hidden></iframe>
+ <div class="wiw-actions">
+  <button type="button" class="wiw-button emby-button raised" data-action="back">${TEXT.back}</button>
+ </div>
+</section>
 <form class="wiw-panel wiw-auth" hidden>
  <div class="wiw-who wiw-for"></div>
  <label class="wiw-field wiw-account" hidden><span class="inputLabel">${TEXT.username}</span><input class="wiw-username emby-input" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" enterkeyhint="next"></label>
@@ -890,6 +910,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         picturesPanel = dialog.querySelector('.wiw-pictures');
         confirmPanel = dialog.querySelector('.wiw-confirm');
         authPanel = dialog.querySelector('.wiw-auth');
+        settingsPanel = dialog.querySelector('.wiw-settings');
         const file = picturesPanel.querySelector('.wiw-file');
 
         dialog.addEventListener('click', e => {
@@ -913,11 +934,14 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
                 removePicture(window.ApiClient);
             } else if (name === 'discard') {
                 discardPicture(window.ApiClient);
+            } else if (name === 'account') {
+                // Jellyfin's own preferences page, inside this dialog (shortcut: route is for Jellyfin Web 10.9+).
+                loadSettings();
+                show(settingsPanel);
+                settingsPanel.querySelector('button').focus();
             } else {
                 closeDialog();
-                if (name === 'account') {
-                    passThrough();
-                } else if (name === 'signout') {
+                if (name === 'signout') {
                     signOut(window.ApiClient);
                 }
             }
@@ -1326,6 +1350,30 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         }).catch(err => console.warn('[WhoIsWatching] could not end a session', err));
     }
 
+    // Loads once and is kept: the gear then shows it at once. Started while the picker is idle.
+    function loadSettings() {
+        const frame = settingsPanel.querySelector('iframe');
+        if (frame.getAttribute('src')) {
+            return;
+        }
+
+        frame.addEventListener('load', () => {
+            try {
+                // Same origin: hide Jellyfin's header and drawer, which the picker already replaces.
+                const style = frame.contentDocument.createElement('style');
+                style.textContent = '.skinHeader,.mainDrawer,.mainDrawer-scrollContainer{display:none!important}'
+                    + '.skinBody,.mainAnimatedPage,.libraryPage{top:0!important;padding-top:0!important;margin-top:0!important}';
+                frame.contentDocument.head.append(style);
+            } catch (err) {
+                console.warn('[WhoIsWatching] could not tidy the settings page', err);
+            }
+
+            frame.hidden = false;
+            settingsPanel.querySelector('.wiw-loading').hidden = true;
+        }, { once: true });
+        frame.src = `${location.pathname}#/mypreferencesmenu`;
+    }
+
     function show(panel) {
         for (const el of dialog.querySelectorAll('.wiw-panel')) {
             el.hidden = el !== panel;
@@ -1527,7 +1575,10 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             return true;
         }
 
-        if (!authPanel.hidden) {
+        if (!settingsPanel.hidden) {
+            showPick();
+            pickPanel.querySelector('[data-action=account]').focus();
+        } else if (!authPanel.hidden) {
             showPick();
         } else if (!confirmPanel.hidden) {
             dropUpload();

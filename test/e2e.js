@@ -571,11 +571,11 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.goto(B + '/web/#/home');
   await avatar.waitFor();
 
-  // account settings passes through to the original button action
+  // account settings open inside the picker, without leaving the page
   await avatar.click();
   await page.click('[data-action=account]');
   await page.waitForTimeout(1000);
-  ok(page.url().includes('mypreferencesmenu') || await page.locator('#app-user-menu .MuiPaper-root').isVisible(), 'Account settings runs original action: ' + page.url());
+  ok(await page.isVisible('.wiw-settings .wiw-frame') && page.url().includes('home'), 'Account settings open inside the picker: ' + page.url());
   await page.keyboard.press('Escape');
   await page.goto(B + '/web/#/home');
   await avatar.waitFor();
