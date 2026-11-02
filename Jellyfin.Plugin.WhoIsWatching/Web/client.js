@@ -28,8 +28,9 @@
 // When any of it is missing, the avatar button keeps its normal behaviour.
 (() => {
     'use strict';
-    // The settings page loads inside the picker's iframe: no second picker in there.
-    if (window.top !== window.self) {
+    // The settings page loads inside the picker's iframe: no second picker in there. (Jellyfin itself
+    // embedded in another site, such as a dashboard, still gets one.)
+    if (window.frameElement && window.frameElement.classList.contains('wiw-frame')) {
         return;
     }
 
@@ -718,10 +719,6 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             build();
         }
 
-        if (api.getCurrentUserId()) {
-            setTimeout(loadSettings, 1500); // warm the settings page while the picker is looked at
-        }
-
         managing = false;
         noPassword = settings && Array.isArray(settings.Passwordless) ? settings.Passwordless : [];
         order = settings && Array.isArray(settings.Order) ? settings.Order : [];
@@ -882,7 +879,6 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 <section class="wiw-panel wiw-settings" hidden>
  <h1 class="wiw-title" id="wiw-title-settings">${TEXT.account}</h1>
  <p class="wiw-hint wiw-loading" role="status">${TEXT.loading}</p>
- <iframe class="wiw-frame" title="${TEXT.account}" hidden></iframe>
  <div class="wiw-actions">
   <button type="button" class="wiw-button emby-button raised" data-action="back">${TEXT.back}</button>
  </div>
@@ -993,6 +989,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         dialog.addEventListener('close', () => {
             authPanel.querySelector('.wiw-input').value = '';
             dropUpload();
+            unloadSettings();
             pending = null;
             // Declined before Jellyfin's sign-in page had even shown: it isn't covered when it arrives.
             // Closed because another page showed, nobody declined anything.
@@ -1350,20 +1347,33 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         }).catch(err => console.warn('[WhoIsWatching] could not end a session', err));
     }
 
-    // Loads once and is kept: the gear then shows it at once. Started while the picker is idle.
+    // A whole second Jellyfin Web runs in the frame, so it loads only when the gear is used, and goes
+    // when the picker closes (signed-in state and memory with it).
     function loadSettings() {
-        const frame = settingsPanel.querySelector('iframe');
-        if (frame.getAttribute('src')) {
+        if (settingsPanel.querySelector('iframe')) {
             return;
         }
 
+        const frame = document.createElement('iframe');
+        frame.className = 'wiw-frame';
+        frame.title = TEXT.account;
+        frame.hidden = true;
         frame.addEventListener('load', () => {
             try {
-                // Same origin: hide Jellyfin's header and drawer, which the picker already replaces.
-                const style = frame.contentDocument.createElement('style');
-                style.textContent = '.skinHeader,.mainDrawer,.mainDrawer-scrollContainer{display:none!important}'
+                // Same origin: hide Jellyfin's header and drawer, which the picker already replaces, and
+                // its Sign out, which would leave this page signed in to nothing (the picker has one).
+                const doc = frame.contentDocument;
+                const style = doc.createElement('style');
+                style.textContent = '.skinHeader,.mainDrawer,.mainDrawer-scrollContainer,.btnLogout{display:none!important}'
                     + '.skinBody,.mainAnimatedPage,.libraryPage{top:0!important;padding-top:0!important;margin-top:0!important}';
-                frame.contentDocument.head.append(style);
+                doc.head.append(style);
+                // Keys typed in the frame don't reach the dialog: Escape there goes back to the picker too.
+                doc.addEventListener('keydown', e => {
+                    if (e.key === 'Escape' && !e.defaultPrevented) {
+                        e.preventDefault();
+                        back();
+                    }
+                });
             } catch (err) {
                 console.warn('[WhoIsWatching] could not tidy the settings page', err);
             }
@@ -1372,6 +1382,15 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             settingsPanel.querySelector('.wiw-loading').hidden = true;
         }, { once: true });
         frame.src = `${location.pathname}#/mypreferencesmenu`;
+        settingsPanel.querySelector('.wiw-actions').before(frame);
+    }
+
+    function unloadSettings() {
+        const frame = settingsPanel.querySelector('iframe');
+        if (frame) {
+            frame.remove();
+            settingsPanel.querySelector('.wiw-loading').hidden = false;
+        }
     }
 
     function show(panel) {

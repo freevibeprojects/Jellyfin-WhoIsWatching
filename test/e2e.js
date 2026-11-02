@@ -576,7 +576,13 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.click('[data-action=account]');
   await page.waitForTimeout(1000);
   ok(await page.isVisible('.wiw-settings .wiw-frame') && page.url().includes('home'), 'Account settings open inside the picker: ' + page.url());
+  const inner = page.frameLocator('.wiw-frame');
+  await inner.locator('.btnLogout').waitFor({ state: 'attached', timeout: 15000 }).catch(() => {});
+  ok(await inner.locator('.btnLogout').count() > 0 && !(await inner.locator('.btnLogout:visible').count()) && !(await inner.locator('.wiw').count()), 'the settings frame has no Sign out of its own and no second picker');
+  await inner.locator('body').press('Escape');
+  ok(await page.isVisible('.wiw-pick') && await page.evaluate(() => document.activeElement.dataset.action) === 'account', 'Escape inside the settings frame goes back to the picker');
   await page.keyboard.press('Escape');
+  ok(await page.waitForFunction(() => !document.querySelector('.wiw[open]') && !document.querySelector('.wiw-frame'), null, { timeout: 5000 }).then(() => true, () => false), 'closing the picker unloads the settings frame');
   await page.goto(B + '/web/#/home');
   await avatar.waitFor();
   await page.setViewportSize({ width: 390, height: 844 });
