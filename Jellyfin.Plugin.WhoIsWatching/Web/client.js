@@ -280,6 +280,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     };
     window.addEventListener('pointerdown', startPreload, true);
     window.addEventListener('focusin', startPreload, true);
+    document.addEventListener('keydown', onShortcut);
 
     // Jellyfin's sign-in page (every page Jellyfin shows fires viewbeforeshow and viewshow; they don't
     // always bubble, so they are caught on the way down), including one shown before this script ran.
@@ -323,6 +324,20 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     });
     if (onLoginPage()) {
         openSignIn(document.getElementById('loginPage'));
+    }
+
+    // P opens the picker, as a press of the avatar would: not while typing, nor in the video player,
+    // which has its own keys.
+    function onShortcut(e) {
+        const typing = e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]');
+        if ((e.key === 'p' || e.key === 'P') && !e.ctrlKey && !e.altKey && !e.metaKey && !e.defaultPrevented && !typing
+            && !isOpen() && !/^#\/video/.test(location.hash) && usable(window.ApiClient)) {
+            const target = Array.from(document.querySelectorAll(AVATAR_SELECTOR)).find(el => el.getClientRects().length);
+            if (target) {
+                e.preventDefault();
+                target.click();
+            }
+        }
     }
 
     // Profiles loaded for the avatar within the last 10 s (focus can come a while before the OK press).

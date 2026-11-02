@@ -54,7 +54,7 @@ Jellyfin 12 never tells clients whether a user has a password: `UserDto.HasPassw
 
 ### Keyboard and remote
 
-Arrow keys and a remote's OK and Back move around the picker. On the profiles, 1–9 go to that profile and a letter to the next profile whose name starts with it.
+Arrow keys and a remote's OK and Back move around the picker. On the profiles, 1–9 go to that profile and a letter to the next profile whose name starts with it. **P** opens the picker from any page, except while typing or in the video player.
 
 ### Look
 

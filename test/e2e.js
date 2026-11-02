@@ -137,6 +137,9 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.waitForSelector('.wiw[open]');
   ok(profileLoads === focusLoads && focusLoads > 1, `keyboard: focus on the avatar preloads the profiles, none requested on OK (${focusLoads} before, ${profileLoads} after)`);
   await page.keyboard.press('Escape');
+  await page.keyboard.press('p');
+  ok(await page.waitForSelector('.wiw[open]', { timeout: 5000 }).then(() => true, () => false), 'P opens the picker');
+  await page.keyboard.press('Escape');
 
   // brand text from the plugin settings: by default "Jellyfin" in Jellyfin's purple, top left
   await avatar.click();
