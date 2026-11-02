@@ -1178,10 +1178,6 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         return typeof api.uploadUserImage === 'function' && (isAdmin(current) || (user === current && mayManageOwn(current)));
     }
 
-    function canAdd(api) {
-        return mayManageOwn(me(api));
-    }
-
     // This browser's per-server memory. A value of the wrong shape (tampered or corrupt) is ignored,
     // so it can't cause blank sign-in attempts or odd requests.
     function stored(api, key, empty) {
@@ -1515,8 +1511,9 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     // The shared gallery: + first (adds a picture for everyone), then the pictures, newest first.
     async function loadGallery(api) {
         let pictures = [];
+        let mayAdd = false;
         try {
-            pictures = (await api.getJSON(api.getUrl('WhoIsWatching/Images'))).Images;
+            ({ Images: pictures, CanAdd: mayAdd } = await api.getJSON(api.getUrl('WhoIsWatching/Images')));
         } catch (err) {
             setError(TEXT.offline);
         }
@@ -1533,7 +1530,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             tile.addEventListener('click', () => choose(api, id));
             return tile;
         });
-        if (canAdd(api) && !isTv()) {
+        if (mayAdd && !isTv()) {
             const add = document.createElement('button');
             add.type = 'button';
             add.className = 'wiw-tile wiw-add cardImageContainer';

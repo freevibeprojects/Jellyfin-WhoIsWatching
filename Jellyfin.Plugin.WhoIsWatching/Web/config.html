@@ -5,7 +5,7 @@
     <title>Who's Watching</title>
 </head>
 <body>
-    <div id="wiwConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select">
+    <div id="wiwConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
         <div data-role="content">
             <div class="content-primary">
                 <h1>Who's Watching</h1>
@@ -32,6 +32,9 @@
                     <div style="margin:1em 0 2em;padding:1em 1.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:var(--jf-palette-background-default,#101010)">
                         <span id="wiwBrandPreview" style="font-weight:700;line-height:1"></span>
                     </div>
+                    <h2>Who may add pictures</h2>
+                    <p class="fieldDescription">Untick someone to stop them adding pictures to the shared gallery; they can still pick from it. Administrators always may.</p>
+                    <div id="wiwUploaders" style="margin-bottom:2em"></div>
                     <button is="emby-button" type="submit" class="raised button-submit block"><span>Save</span></button>
                 </form>
 
@@ -90,9 +93,36 @@
                     });
                 }
 
+                // IDs compared without dashes, however the server wrote them.
+                var plain = function (id) { return String(id).replace(/-/g, '').toLowerCase(); };
+
+                function showUploaders(users, blocked) {
+                    var list = field('wiwUploaders');
+                    list.textContent = '';
+                    users.filter(function (user) { return !user.Policy.IsAdministrator; }).forEach(function (user) {
+                        var row = document.createElement('div');
+                        row.className = 'checkboxContainer';
+                        var label = document.createElement('label');
+                        label.className = 'emby-checkbox-label';
+                        var box = document.createElement('input');
+                        box.setAttribute('is', 'emby-checkbox');
+                        box.type = 'checkbox';
+                        box.setAttribute('data-id', user.Id);
+                        box.checked = blocked.map(plain).indexOf(plain(user.Id)) < 0;
+                        var name = document.createElement('span');
+                        name.className = 'checkboxLabel';
+                        name.textContent = user.Name;
+                        label.append(box, name);
+                        row.append(label);
+                        list.append(row);
+                    });
+                }
+
                 page.addEventListener('pageshow', function () {
                     Dashboard.showLoadingMsg();
-                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                    Promise.all([ApiClient.getPluginConfiguration(pluginId), ApiClient.getUsers()]).then(function (results) {
+                        var config = results[0];
+                        showUploaders(results[1], config.BlockedUploaders || []);
                         field('wiwBrandText').value = config.BrandText || '';
                         field('wiwBrandColor').value = /^#[0-9A-Fa-f]{6}$/.test(config.BrandColor) ? config.BrandColor : '#AA5CC3';
                         field('wiwBrandSize').value = config.BrandSize;
@@ -115,6 +145,8 @@
                         config.BrandColor = field('wiwBrandColor').value;
                         config.BrandSize = Number(field('wiwBrandSize').value);
                         config.BrandPosition = field('wiwBrandPosition').value;
+                        config.BlockedUploaders = Array.prototype.filter.call(page.querySelectorAll('#wiwUploaders input'), function (box) { return !box.checked; })
+                            .map(function (box) { return box.getAttribute('data-id'); });
                         ApiClient.updatePluginConfiguration(pluginId, config).then(Dashboard.processPluginConfigurationUpdateResult);
                     });
                 });

@@ -89,7 +89,7 @@ public sealed partial class GalleryController : ControllerBase
             .ToList();
 
     /// <summary>
-    /// Lists the gallery, newest first, with which pictures the caller may remove.
+    /// Lists the gallery, newest first, with which pictures the caller may remove and whether they may add one.
     /// </summary>
     /// <returns>The pictures.</returns>
     [HttpGet("Images")]
@@ -97,7 +97,8 @@ public sealed partial class GalleryController : ControllerBase
     public Gallery GetImages()
         => new(Pictures().OrderByDescending(System.IO.File.GetLastWriteTimeUtc)
             .Select(path => new GalleryPicture(Path.GetFileNameWithoutExtension(path)!, MayDelete(path)))
-            .ToList());
+            .ToList(),
+            MayAdd());
 
     /// <summary>
     /// Gets a gallery picture. Anonymous like Jellyfin's own user images, since an img tag can't send a
@@ -125,14 +126,14 @@ public sealed partial class GalleryController : ControllerBase
 
     /// <summary>
     /// Adds a picture to the gallery: a JPEG body of at most 1 MB. Allowed for anyone who
-    /// may change their own profile picture in Jellyfin.
+    /// may change their own profile picture in Jellyfin, unless an administrator ruled them out.
     /// </summary>
     /// <returns>The new picture's ID.</returns>
     [HttpPost("Images")]
     [Authorize]
     public async Task<ActionResult> AddImage()
     {
-        if (!MayManageOwnPreferences())
+        if (!MayAdd())
         {
             return StatusCode(StatusCodes.Status403Forbidden);
         }
@@ -293,6 +294,11 @@ public sealed partial class GalleryController : ControllerBase
         => CallerId() is { } userId
             && (User.IsInRole("Administrator") || _userManager.GetUserById(userId) is { EnableUserPreferenceAccess: true });
 
+    // Administrators always may; others as for their own picture, unless ruled out on the plugin's page.
+    private bool MayAdd()
+        => MayManageOwnPreferences()
+            && (User.IsInRole("Administrator") || !(Plugin.Instance?.Configuration.BlockedUploaders ?? []).Contains(CallerId()!.Value));
+
     [GeneratedRegex("^#[0-9A-Fa-f]{6}$")]
     private static partial Regex ColorPattern();
 }
@@ -308,7 +314,8 @@ public sealed record GalleryPicture(string Id, bool CanDelete);
 /// The shared gallery as one person sees it.
 /// </summary>
 /// <param name="Images">The pictures, newest first.</param>
-public sealed record Gallery(IReadOnlyList<GalleryPicture> Images);
+/// <param name="CanAdd">Whether the caller may add pictures.</param>
+public sealed record Gallery(IReadOnlyList<GalleryPicture> Images, bool CanAdd);
 
 /// <summary>
 /// The picker's brand text, and the profiles it signs in without a password step.

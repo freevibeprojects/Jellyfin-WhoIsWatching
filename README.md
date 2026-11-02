@@ -18,7 +18,7 @@ if needed, and you are now that user.
 | `ClientScriptController.cs` | Serves the embedded script (`GET /WhoIsWatching/client.js`) anonymously. It is static and holds no data. |
 | `GalleryController.cs` | The brand-text settings (`GET /WhoIsWatching/Settings`, anonymous, because the sign-in page shows the brand text) and the shared picture gallery (`/WhoIsWatching/Images`). See *Profile pictures*. |
 | `Web/client.js` | Covers Jellyfin's sign-in page with the picker, and intercepts clicks on the avatar button to show it. It switches users with Jellyfin's own client API, then reloads the page. *Manage profiles* changes pictures; the gear runs the avatar button's normal action (settings or user menu), and the sign-out button signs out of Jellyfin (which also forgets remembered profiles). |
-| `Web/config.html` | The plugin's page in *Dashboard → Plugins*: brand text, and removing gallery pictures. |
+| `Web/config.html` | The plugin's page in *Dashboard → Plugins*: brand text, who may add pictures, and removing gallery pictures. |
 
 The switch uses only what the login page uses:
 
@@ -77,7 +77,7 @@ It works like Netflix:
 
 The picture is then copied to the profile through Jellyfin's own user-image API, which applies Jellyfin's permission checks.
 
-Each person may add up to 20 pictures (administrators: up to the gallery's 200). Jellyfin's TV layout has no **+** tile, since a remote can't pick a file: pictures added from a phone or computer show up there.
+Each person may add up to 20 pictures (administrators: up to the gallery's 200). On the plugin's dashboard page, administrators can untick people under *Who may add pictures*: they can still pick from the gallery, but not add to it. Jellyfin's TV layout has no **+** tile, since a remote can't pick a file: pictures added from a phone or computer show up there.
 
 The gallery is kept on the server in `<data dir>/plugins/configurations/WhoIsWatching/images/`, one folder per person who added pictures, so it survives plugin updates. Administrators remove pictures in the plugin's dashboard page. People remove pictures they added with **Remove from gallery** on the *Change profile picture?* step (administrators can remove any there), and *Not yet* right after adding one takes it out again. Removing one doesn't change anyone's current picture.
 

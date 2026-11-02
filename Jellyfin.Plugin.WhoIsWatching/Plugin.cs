@@ -74,6 +74,11 @@ public sealed class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets where the text goes: TopLeft, TopCenter or TopRight.
     /// </summary>
     public string BrandPosition { get; set; } = "TopLeft";
+
+    /// <summary>
+    /// Gets or sets the users who may not add pictures to the gallery (they can still pick from it).
+    /// </summary>
+    public Guid[] BlockedUploaders { get; set; } = [];
 }
 
 /// <summary>

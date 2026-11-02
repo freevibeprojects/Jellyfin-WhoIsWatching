@@ -242,8 +242,13 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.waitForFunction(() => { const t = document.querySelector('#wiwBrandText'); return t && t.value === 'Jellyfin'; }, null, { timeout: 30000 });
   await page.waitForSelector('#wiwGallery .wiwDelete');
   await page.fill('#wiwBrandText', 'Saved here');
+  const uploaders = await page.$$eval('#wiwUploaders input', boxes => boxes.map(b => b.closest('label').querySelector('.checkboxLabel').textContent + (b.checked ? '' : ' (no)')).join());
+  await page.$eval('#wiwUploaders .checkboxContainer:last-child input', b => b.click()); // untick the last (Kid)
   await page.click('#wiwConfigForm button[type=submit]');
   const saved = await page.waitForFunction(() => window.ApiClient.getJSON(window.ApiClient.getUrl('WhoIsWatching/Settings')).then(s => s.Text === 'Saved here'), null, { timeout: 10000 }).then(() => true, () => false);
+  const blocked = (await (await fetch(B + '/Plugins/2d627493-2b57-432a-b238-c22aaf9fd609/Configuration', { headers: auth(adminToken) })).json()).BlockedUploaders;
+  const kidUser = (await (await fetch(B + '/Users', { headers: auth(adminToken) })).json()).find(u => u.Name === 'Kid');
+  ok(uploaders === 'Bob,Hidden,Kid' && blocked.length === 1 && blocked[0].replace(/-/g, '') === kidUser.Id, 'the dashboard lists who may add pictures (not administrators) and saves who may not: ' + uploaders + ' ' + JSON.stringify(blocked));
   const listed = (await page.$$('#wiwGallery .wiwDelete')).length;
   page.once('dialog', d => d.accept()); // "Delete this picture?"
   await page.click('#wiwGallery .wiwDelete');
@@ -504,6 +509,11 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   const adminAdds = await post(adminToken, jpeg);
   if (adminAdds.ok) bobsIds.push((await adminAdds.json()).Id);
   rules.perUserCap = capped === 409 && bobsIds.length <= 21 && adminAdds.ok;
+  const bobGallery = async () => (await (await fetch(B + '/WhoIsWatching/Images', { headers: auth(bobApi) })).json()).CanAdd;
+  const mayAddBefore = await bobGallery();
+  await config({ ...defaults, BlockedUploaders: [bobId] });
+  rules.blockedUploader = mayAddBefore === true && (await post(bobApi, jpeg)).status === 403 && await bobGallery() === false;
+  await config(defaults);
   for (const id of bobsIds) await fetch(B + '/WhoIsWatching/Images/' + id, { method: 'DELETE', headers: auth(adminToken) });
   await fetch(B + `/Users/${kidPolicy.Id}/Policy`, { method: 'POST', headers: { ...auth(adminToken), 'Content-Type': 'application/json' }, body: JSON.stringify(kidPolicy.Policy) });
   ok(Object.values(rules).every(Boolean), 'gallery API rules: ' + JSON.stringify(rules));
