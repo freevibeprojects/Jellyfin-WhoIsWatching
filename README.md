@@ -41,7 +41,7 @@ The picker doesn't wait for the page. The profiles, the brand text and the profi
 
 Jellyfin 12 never tells clients whether a user has a password: `UserDto.HasPassword` is always `true`, and the login page always shows the password form. This plugin keeps that rule.
 
-- Every profile gets a password step, and leaving it blank is allowed.
+- Every profile gets a password step, and leaving it blank is allowed. The eye button in the field shows what was typed, and after a wrong password the field keeps it, selected, to fix or type over.
 - A profile is never tried with a blank password automatically. A wrong guess would count toward Jellyfin's login lockout and appear in the activity log.
 - After a profile signs in with a blank password once, this browser remembers its **user ID** (in `localStorage`, per server) and switches to it in one click next time. If a password is added later, the one-click attempt fails once and the password step appears.
 - **Remember on this device** (in the password step) keeps that profile signed in on this browser, so it opens in one click, like Jellyfin's own *Remember me*. What is kept is the profile's Jellyfin access token, never the password. Switching away from a remembered profile leaves its session running instead of ending it.

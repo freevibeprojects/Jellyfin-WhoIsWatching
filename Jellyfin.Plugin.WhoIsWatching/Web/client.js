@@ -39,6 +39,7 @@
         signOut: 'Sign out',
         close: 'Close',
         password: 'Password',
+        showPassword: 'Show password',
         username: 'Username',
         otherAccount: 'Other account',
         signIn: 'Sign in',
@@ -81,7 +82,7 @@
     const REMEMBERED_KEY = 'whoiswatching-remembered-';
     const LAST_KEY = 'whoiswatching-last-'; // [user ID] last signed in from the picker on this device
     const CARD_COLORS = 5; // the theme's defaultCardBackground1..5, as on Jellyfin's sign-in page
-    // Material icons (Apache 2.0): close, settings, edit, add, arrow, lock open, sign out, person.
+    // Material icons (Apache 2.0): close, settings, edit, add, arrow, lock open, sign out, visibility, person.
     const ICON_CLOSE = 'M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z';
     const ICON_SETTINGS = 'M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z';
     const ICON_EDIT = 'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z';
@@ -89,6 +90,7 @@
     const ICON_ARROW = 'M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z';
     const ICON_OPEN = 'M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-9h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h1.9c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm0 12H6V10h12v10z';
     const ICON_SIGN_OUT = 'M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z';
+    const ICON_SHOW = 'M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z';
     const ICON_PERSON = 'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z';
 
     // Everything scales with --u: 16px at 1080p, growing with the screen (21px at 1440p, 32px at 4K),
@@ -180,6 +182,10 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 .wiw-auth .wiw-profile{cursor:default;color:var(--jf-palette-text-primary,#fff)}
 .wiw-field{display:flex;flex-direction:column;align-items:stretch;gap:.4em;width:20em;max-width:80vw;text-align:start}
 .wiw-field .inputLabel{margin:0}
+.wiw-secret{position:relative;display:flex}
+.wiw .wiw-secret .emby-input{flex:1;padding-right:2.6em}
+.wiw .wiw-reveal{position:absolute;top:0;right:0;bottom:0;width:2.6em;height:auto;margin:0;padding:0;font-size:1em}
+.wiw .wiw-reveal[aria-pressed=true]{color:var(--wiw-accent,#00a4dc)}
 .wiw-hint{margin:0;font-size:.85em}
 .wiw .wiw-check{flex-direction:column;width:20em;max-width:80vw;margin:-1em 0 0;text-align:start}
 .wiw-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:1.5em}
@@ -794,7 +800,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 <form class="wiw-panel wiw-auth" hidden>
  <div class="wiw-who wiw-for"></div>
  <label class="wiw-field wiw-account" hidden><span class="inputLabel">${TEXT.username}</span><input class="wiw-username emby-input" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" enterkeyhint="next"></label>
- <label class="wiw-field"><span class="inputLabel" id="wiw-password-label">${TEXT.password}</span><input class="wiw-input emby-input" type="password" autocomplete="current-password" aria-labelledby="wiw-title-auth wiw-password-label" aria-describedby="wiw-hint"><span class="wiw-hint fieldDescription" id="wiw-hint">${TEXT.passwordHint}</span></label>
+ <label class="wiw-field"><span class="inputLabel" id="wiw-password-label">${TEXT.password}</span><span class="wiw-secret"><input class="wiw-input emby-input" type="password" autocomplete="current-password" aria-labelledby="wiw-title-auth wiw-password-label" aria-describedby="wiw-hint"><button type="button" class="wiw-reveal paper-icon-button-light" data-action="reveal" aria-pressed="false" aria-label="${TEXT.showPassword}" title="${TEXT.showPassword}">${icon(ICON_SHOW)}</button></span><span class="wiw-hint fieldDescription" id="wiw-hint">${TEXT.passwordHint}</span></label>
  <div class="wiw-check checkboxContainer">
   <label class="emby-checkbox-label"><input class="wiw-remember emby-checkbox" type="checkbox" aria-describedby="wiw-remember-hint"><span class="checkboxLabel">${TEXT.remember}</span><span class="checkboxOutline"><span class="material-icons checkboxIcon checkboxIcon-checked check" aria-hidden="true"></span><span class="material-icons checkboxIcon checkboxIcon-unchecked" aria-hidden="true"></span></span></label>
   <span class="wiw-hint fieldDescription checkboxFieldDescription" id="wiw-remember-hint">${TEXT.rememberHint}</span>
@@ -823,7 +829,9 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             }
 
             const name = action.getAttribute('data-action');
-            if (name === 'back') {
+            if (name === 'reveal') {
+                showPassword(action.getAttribute('aria-pressed') !== 'true');
+            } else if (name === 'back') {
                 back();
             } else if (name === 'manage') {
                 setManaging(window.ApiClient, !managing);
@@ -1106,9 +1114,16 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         authPanel.querySelector('.wiw-username').value = user ? user.Name : '';
         authPanel.querySelector('.wiw-check').hidden = !user || !canRemember(api) || isAdmin(user);
         authPanel.querySelector('.wiw-remember').checked = Boolean(token);
+        showPassword(false);
         show(authPanel);
         setError('');
         authPanel.querySelector(user ? '.wiw-input' : '.wiw-username').focus();
+    }
+
+    // For a slow or shaky typist, who can't otherwise see the mistyped letter.
+    function showPassword(shown) {
+        authPanel.querySelector('.wiw-input').type = shown ? 'text' : 'password';
+        authPanel.querySelector('.wiw-reveal').setAttribute('aria-pressed', String(shown));
     }
 
     function isAdmin(user) {
@@ -1710,9 +1725,11 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             return;
         }
 
-        // Left/Right stay with a text field's cursor; Up/Down move between controls.
+        // Left/Right stay with a text field's cursor (Right past its end reaches the eye button); Up/Down
+        // move between controls.
+        const field = e.target.classList.contains('emby-input') ? e.target : null;
         if (!/^Arrow(Left|Right|Up|Down)$/.test(e.key)
-            || (e.target.classList.contains('emby-input') && (e.key === 'ArrowLeft' || e.key === 'ArrowRight'))) {
+            || (field && (e.key === 'ArrowLeft' || (e.key === 'ArrowRight' && field.selectionStart < field.value.length)))) {
             return;
         }
 
@@ -1735,7 +1752,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         }
 
         // Fields and checkboxes are placed by their label, which spans the row.
-        const box = el => (el.closest('label') || el).getBoundingClientRect();
+        const box = el => (el.tagName === 'INPUT' && el.closest('label') || el).getBoundingClientRect();
         const a = box(from);
         let best = null;
         let bestScore = Infinity;

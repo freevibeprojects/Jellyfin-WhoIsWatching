@@ -320,6 +320,13 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.waitForFunction(() => document.querySelector('.wiw-auth .wiw-error').textContent);
   ok((await page.textContent('.wiw-auth .wiw-error')).startsWith('Couldn’t sign in'), 'wrong password shows generic error');
   ok(await page.inputValue('.wiw-input') === 'nope' && await page.$eval('.wiw-input', i => document.activeElement === i && i.selectionStart === 0 && i.selectionEnd === 4), 'the wrong password stays, selected, to fix or type over');
+  await page.keyboard.press('End');
+  await page.keyboard.press('ArrowRight');
+  ok(await page.evaluate(() => document.activeElement.classList.contains('wiw-reveal')), 'Right at the end of the password reaches Show password');
+  await page.keyboard.press('Enter');
+  ok(await page.$eval('.wiw-input', i => i.type === 'text') && await page.$eval('.wiw-reveal', b => b.getAttribute('aria-pressed') === 'true'), 'Show password shows it');
+  await page.keyboard.press('Enter');
+  ok(await page.$eval('.wiw-input', i => i.type === 'password'), 'and hides it again');
   ok(await me() === 'Alice', 'still Alice after failure');
   await page.waitForTimeout(400); await page.screenshot({ path: out + '/' + (layout || 'default') + '-2-auth-error.png' });
   await page.keyboard.press('Escape');
