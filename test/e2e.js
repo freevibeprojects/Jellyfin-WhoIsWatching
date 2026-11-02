@@ -387,10 +387,12 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await avatar.waitFor({ timeout: 30000 });
   ok(await me() === 'Kid', 'Kid switched in one click (remembered passwordless)');
 
-  // remembered profile: one click, no password sent
+  // remembered profile: marked, one click, no password sent
   let sent = auths.length;
   await avatar.click();
-  await Promise.all([page.waitForEvent('load'), page.click('.wiw-grid button[aria-label="Bob"]')]);
+  await page.waitForSelector('.wiw[open] .wiw-grid button[aria-label^="Bob"]');
+  ok(await page.$eval('.wiw-grid button[aria-label^="Bob"]', b => b.getAttribute('aria-label') === 'Bob, opens without a password on this device' && !!b.querySelector('.wiw-badge svg')), 'a remembered profile is marked as opening without a password');
+  await Promise.all([page.waitForEvent('load'), page.click('.wiw-grid button[aria-label^="Bob"]')]);
   await avatar.waitFor({ timeout: 30000 });
   ok(await me() === 'Bob' && auths.length === sent, 'remembered Bob opens in one click without a password');
 
@@ -401,7 +403,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await fetch(B + '/Sessions/Logout', { method: 'POST', headers: auth(bobToken) });
   sent = auths.length;
   await avatar.click();
-  await page.click('.wiw-grid button[aria-label="Bob"]');
+  await page.click('.wiw-grid button[aria-label^="Bob"]');
   await page.waitForSelector('.wiw-auth:not([hidden]) .wiw-input:focus', { timeout: 10000 });
   ok(auths.length === sent && await page.isChecked('.wiw-remember'), 'ended session asks for the password, still set to remember');
   await page.fill('.wiw-input', 'bobpw');

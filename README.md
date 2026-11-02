@@ -45,6 +45,7 @@ Jellyfin 12 never tells clients whether a user has a password: `UserDto.HasPassw
 - A profile is never tried with a blank password automatically. A wrong guess would count toward Jellyfin's login lockout and appear in the activity log.
 - After a profile signs in with a blank password once, this browser remembers its **user ID** (in `localStorage`, per server) and switches to it in one click next time. If a password is added later, the one-click attempt fails once and the password step appears.
 - **Remember on this device** (in the password step) keeps that profile signed in on this browser, so it opens in one click, like Jellyfin's own *Remember me*. What is kept is the profile's Jellyfin access token, never the password. Switching away from a remembered profile leaves its session running instead of ending it.
+  - Remembered profiles carry an open-lock mark in the picker, so whoever hands the device over can see which profiles open without a password.
   - **Administrator accounts can never be remembered.** They always ask for the password, so a child on a shared TV can't one-click into the account that controls parental settings.
   - A remembered profile is forgotten, and asks for its password again, when its password is changed, its session is ended (for example from *Dashboard → Devices*), or anyone signs out of Jellyfin in this browser. Signing out also ends every remembered profile's session.
   - The server still applies the profile's rules (disabled account, access schedule, remote access) every time it is used.
