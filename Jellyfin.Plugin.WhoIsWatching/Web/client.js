@@ -1812,6 +1812,15 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             }
 
             id = (await response.json()).Id;
+            // A small copy for the gallery's tiles; if it doesn't arrive, they load the picture itself.
+            const small = document.createElement('canvas');
+            small.width = small.height = Math.min(canvas.width, 256);
+            small.getContext('2d').drawImage(canvas, 0, 0, small.width, small.height);
+            await fetch(api.getUrl(`WhoIsWatching/Images/${id}/Thumbnail`), {
+                method: 'POST',
+                headers: { Authorization: `MediaBrowser Token="${api.accessToken()}"`, 'Content-Type': 'image/jpeg' },
+                body: await new Promise(resolve => small.toBlob(resolve, 'image/jpeg', 0.85))
+            }).catch(() => {});
         } catch (err) {
             // 409: the gallery, or this person's share of it, is full
             setError(err && err.status === 409 ? TEXT.galleryFull : TEXT.pictureFailed);

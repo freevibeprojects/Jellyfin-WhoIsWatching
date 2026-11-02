@@ -78,7 +78,7 @@ It works like Netflix:
 
 The picture is then copied to the profile through Jellyfin's own user-image API, which applies Jellyfin's permission checks.
 
-The gallery's tiles load 256 px copies, made once by Jellyfin's own image encoder and kept in Jellyfin's cache; the *Change profile picture?* step and the profile itself get the full picture.
+The gallery's tiles load 256 px copies, which the picker makes and uploads along with each picture (pictures added before 1.6.1 have none, so their tiles load the picture itself); the *Change profile picture?* step and the profile itself get the full picture.
 
 Each person may add up to 20 pictures (administrators: up to the gallery's 200). On the plugin's dashboard page, administrators can untick people under *Who may add pictures*: they can still pick from the gallery, but not add to it. Jellyfin's TV layout has no **+** tile, since a remote can't pick a file: pictures added from a phone or computer show up there.
 
@@ -157,6 +157,7 @@ After a Jellyfin upgrade, run the smoke test (below) to check all of these at on
 - Picture gallery (`/WhoIsWatching/Images`):
   - Listing needs a signed-in user. Each picture is served anonymously by its random ID, because an `<img>` can't send a token; Jellyfin serves user pictures the same way.
   - Adding needs Jellyfin's user-preference access (on by default; see *Manage profiles* above). Only JPEG is accepted (the picker re-encodes every upload to JPEG, which also drops location data from photos), checked by its bytes (a whole JPEG: start and end markers, and a declared size of at most 1024 × 1024 pixels, so a small file can't make every viewer's browser decode a gigantic picture), at most 1 MB each, 20 per person (so one account can't fill it for everyone) and 200 in total. Every profile's browser shows these pictures, so other image formats (WebP's decoder had a remote-code-execution bug, CVE-2023-4863) are refused.
+  - A picture's thumbnail (`POST /WhoIsWatching/Images/{id}/Thumbnail`) passes the same checks with at most 256 × 256 pixels, and only whoever may remove the picture can set it.
   - Files are named by the server (a new GUID), so nothing a client sends becomes a path. They are served with `X-Content-Type-Options: nosniff` and a sandboxing `Content-Security-Policy`.
   - Administrators can delete any picture; others only pictures they added (*Remove from gallery*, or *Not yet* right after an upload). The list tells each person which ones they may remove.
   - Profile pictures are applied through Jellyfin's own API, so Jellyfin's permission checks decide who may change whose picture.

@@ -206,7 +206,8 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   const newest = (await (await fetch(B + '/WhoIsWatching/Images', { headers: auth(adminToken) })).json()).Images[0].Id;
   const fullSide = side(Buffer.from(await (await fetch(B + '/WhoIsWatching/Images/' + newest)).arrayBuffer()));
   const thumbSide = side(Buffer.from(await (await fetch(B + '/WhoIsWatching/Images/' + newest + '?thumb=true')).arrayBuffer()));
-  ok(fullSide > 256 && (thumbSide === 256 || thumbSide === fullSide), 'gallery thumbnails: 256 px, or the picture itself where the server cannot resize (the picture ' + fullSide + ' px, the thumbnail ' + thumbSide + ' px)');
+  // (on a TV the newest picture came through the API, without a thumbnail: its tiles get the picture)
+  ok(fullSide > 256 && (layout === 'tv' ? thumbSide === fullSide : thumbSide === 256), 'the picker uploads a 256 px thumbnail for the gallery\'s tiles (the picture ' + fullSide + ' px, the thumbnail ' + thumbSide + ' px)');
   await page.click('.wiw-grid button[aria-label^="Alice"]');
   await page.waitForSelector('.wiw-pictures:not([hidden])');
   const noPictureNoRemove = await page.$eval('.wiw-pictures [data-action=unset]', b => b.hidden);
@@ -549,6 +550,9 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
     added: added.status === 200,
     served: served.headers.get('content-type') === 'image/jpeg' && served.headers.get('x-content-type-options') === 'nosniff',
     noPreferences: (await post(kidApi, Buffer.from([0xff, 0xd8, 0xff, 0xe0]))).status === 403,
+    thumbnailForOthers: (await fetch(B + `/WhoIsWatching/Images/${adminsId}/Thumbnail`, { method: 'POST', headers: { ...auth(bobApi), 'Content-Type': 'image/jpeg' }, body: jpegOf(256, 256) })).status === 403,
+    thumbnailTooBig: (await fetch(B + `/WhoIsWatching/Images/${addedId}/Thumbnail`, { method: 'POST', headers: { ...auth(bobApi), 'Content-Type': 'image/jpeg' }, body: jpegOf(512, 512) })).status === 400,
+    thumbnailAdded: (await fetch(B + `/WhoIsWatching/Images/${addedId}/Thumbnail`, { method: 'POST', headers: { ...auth(bobApi), 'Content-Type': 'image/jpeg' }, body: jpegOf(200, 200) })).status === 204,
     userCantDeleteOthers: (await fetch(B + '/WhoIsWatching/Images/' + adminsId, { method: 'DELETE', headers: auth(bobApi) })).status === 403,
     userDeletesOwn: (await fetch(B + '/WhoIsWatching/Images/' + addedId, { method: 'DELETE', headers: auth(bobApi) })).status === 204,
     adminDeletes: (await fetch(B + '/WhoIsWatching/Images/' + adminsId, { method: 'DELETE', headers: auth(adminToken) })).status === 204,
