@@ -188,6 +188,14 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.waitForSelector('.wiw[open]');
   b = await brand();
   ok(b.text === 'Family TV' && b.color === 'rgb(255, 136, 0)' && scaled(b, 56) && b.right < 150 && b.left > 300, 'custom brand text: ' + JSON.stringify(b));
+  await page.keyboard.press('Escape');
+  await config({ BrandText: 'The Sharma Cinema', BrandColor: '#FF8800', BrandSize: 56, BrandPosition: 'TopCenter' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await avatar.click();
+  await page.waitForSelector('.wiw[open]');
+  const fits = await page.$eval('.wiw-brand', el => [el.scrollWidth, el.clientWidth, getComputedStyle(el).fontSize]);
+  ok(fits[0] <= fits[1], 'a long brand text gets smaller to fit a phone instead of being cut off: ' + fits);
+  await page.setViewportSize({ width: 1280, height: 800 });
   await config(defaults);
   await page.keyboard.press('Escape');
 

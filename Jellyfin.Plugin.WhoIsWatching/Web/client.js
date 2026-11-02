@@ -189,7 +189,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
  .wiw-brand{top:max(var(--u),env(safe-area-inset-top));left:max(calc(1.5 * var(--u)),env(safe-area-inset-left))}
  .wiw-brand[data-position=TopRight]{right:calc(max(calc(.75 * var(--u)),env(safe-area-inset-right)) + 3.65 * var(--u))}
  .wiw-title{font-size:min(3em,8vw)}
- .wiw-brand{font-size:min(calc(var(--wiw-brand-size,40) * var(--u) / 16),10vw)}
+ .wiw-brand{font-size:min(calc(var(--wiw-brand-size,40) * var(--u) / 16),10vw,calc((100vw - 9 * var(--u)) * 1.6 / var(--wiw-brand-chars,1)))}
  .wiw-grid{gap:min(calc(2 * var(--u)),4vw)}
  .wiw-profile{width:min(calc(9 * var(--u)),26vw)}
  .wiw-crowded .wiw-grid .wiw-profile{width:min(calc(7 * var(--u)),22vw)}
@@ -698,6 +698,8 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             brand.style.color = settings.Color;
             brand.dataset.position = settings.Position;
             dialog.style.setProperty('--wiw-brand-size', String(settings.Size));
+            // A long text shrinks to fit narrow screens (a bold letter is about 0.6em wide) before ellipsis.
+            dialog.style.setProperty('--wiw-brand-chars', String(settings.Text.length));
         }
     }
 
