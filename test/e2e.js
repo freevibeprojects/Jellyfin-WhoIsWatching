@@ -35,6 +35,8 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.waitForFunction(() => window.loginShownAt, null, { timeout: 30000 }); // the picker can come first
   const instant = { ahead: await profilesAhead(0), noFade: await page.$eval('.wiw', d => getComputedStyle(d).animationName === 'none') };
   ok(instant.ahead && instant.noFade, 'the sign-in picker is ready with the page: profiles requested ahead, no fade-in ' + JSON.stringify(instant));
+  const script = await (await fetch(B + '/WhoIsWatching/client.js')).text();
+  ok(script.startsWith('// SPDX-License-Identifier') && !/\n\s*\/\//.test(script) && !/\n\s/.test(script) && script.length < 60000, 'the script is served without comment lines or indentation (' + script.length + ' bytes)');
   const signedOut = await page.evaluate(() => ({
     names: Array.from(document.querySelectorAll('.wiw-grid .wiw-name'), e => e.textContent).join(),
     noSettings: document.querySelector('[data-action=manage]').hidden && document.querySelector('[data-action=account]').hidden,

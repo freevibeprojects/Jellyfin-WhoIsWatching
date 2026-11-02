@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
+using System;
 using System.IO;
+using System.Linq;
+using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -29,11 +32,14 @@ public sealed class ClientScriptController : ControllerBase
         return File(Script, "text/javascript; charset=utf-8");
     }
 
+    // Comment lines, blank lines and indentation are a third of the source; browsers download and parse it without them.
+    // Safe because client.js's only multi-line strings are CSS and HTML, where no line starts with //.
+    // The licence line stays.
     private static byte[] ReadScript()
     {
         using var stream = typeof(ClientScriptController).Assembly.GetManifestResourceStream("WhoIsWatching.client.js")!;
-        using var bytes = new MemoryStream();
-        stream.CopyTo(bytes);
-        return bytes.ToArray();
+        using var reader = new StreamReader(stream);
+        var lines = reader.ReadToEnd().ReplaceLineEndings("\n").Split('\n').Select(line => line.TrimStart());
+        return Encoding.UTF8.GetBytes(string.Join('\n', lines.Take(1).Concat(lines.Skip(1).Where(line => line.Length > 0 && !line.StartsWith("//", StringComparison.Ordinal)))));
     }
 }
