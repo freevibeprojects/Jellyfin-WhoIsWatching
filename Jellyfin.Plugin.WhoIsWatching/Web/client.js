@@ -59,7 +59,7 @@
         noPictures: 'No pictures yet.',
         addElsewhere: 'Pictures are added from a phone or computer.',
         confirmPicture: 'Change profile picture?',
-        added: 'Added to the shared gallery.',
+        added: 'Added to the shared gallery. Not yet takes it out again.',
         currentPicture: 'Current',
         newPicture: 'New',
         notYet: 'Not yet',
@@ -240,6 +240,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     let managing = false; // "Manage profiles": picking a profile changes its picture
     let editing; // the user whose picture is being changed
     let chosen; // the gallery picture about to be applied
+    let uploaded = null; // a picture just added and not yet applied
     const buttons = new Map(); // user ID -> profile button
     const colors = new Map(); // user ID -> avatar colour
     const watched = new WeakSet(); // ApiClients whose sign-out is watched
@@ -872,6 +873,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 
         dialog.addEventListener('close', () => {
             authPanel.querySelector('.wiw-input').value = '';
+            dropUpload();
             pending = null;
             // Declined before Jellyfin's sign-in page had even shown: it isn't covered when it arrives.
             // Closed because another page showed, nobody declined anything.
@@ -1408,6 +1410,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         if (!authPanel.hidden) {
             showPick();
         } else if (!confirmPanel.hidden) {
+            dropUpload();
             show(picturesPanel);
             setError('');
             const tiles = Array.from(picturesPanel.querySelectorAll('.wiw-tile'));
@@ -1488,13 +1491,14 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     }
 
     // Netflix's "Change profile icon?" step: current picture, arrow, new picture.
-    // added: the picture was just uploaded, and is in the gallery whatever is chosen next.
+    // added: the picture was just uploaded; backing out takes it out of the gallery again.
     function choose(api, id, added) {
         if (busy) {
             return;
         }
 
         chosen = id;
+        uploaded = added ? id : null;
         confirmPanel.querySelector('.wiw-added').hidden = !added;
         const picture = document.createElement('span');
         picture.className = 'wiw-avatar cardImageContainer';
@@ -1524,6 +1528,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             }
 
             await api.uploadUserImage(editing.Id, 'Primary', await response.blob());
+            uploaded = null;
             render(api, await loadUsers(api));
             setBusy(false);
             showPick();
@@ -1532,6 +1537,27 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             setBusy(false);
             setError(TEXT.pictureFailed);
         }
+    }
+
+    // Backing out after an upload takes the picture out of the gallery again: nobody sees a picture
+    // its owner changed their mind about. The server lets people remove pictures they added.
+    function dropUpload() {
+        if (!uploaded) {
+            return;
+        }
+
+        const api = window.ApiClient;
+        fetch(api.getUrl('WhoIsWatching/Images/' + uploaded), {
+            method: 'DELETE',
+            headers: { Authorization: `MediaBrowser Token="${api.accessToken()}"` },
+            keepalive: true
+        }).catch(err => console.warn('[WhoIsWatching] could not remove a picture', err));
+        const tile = picturesPanel.querySelector(`.wiw-tile[data-id="${uploaded}"]`);
+        if (tile) {
+            tile.parentNode.remove();
+        }
+
+        uploaded = null;
     }
 
     // Adds a picture to the shared gallery, then offers it for this profile. It is cropped to a centred

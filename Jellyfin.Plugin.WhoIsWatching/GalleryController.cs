@@ -7,7 +7,6 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using MediaBrowser.Common.Api;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Authorization;
@@ -197,18 +196,24 @@ public sealed partial class GalleryController : ControllerBase
     }
 
     /// <summary>
-    /// Removes a gallery picture. Administrators only.
+    /// Removes a gallery picture: administrators any, others only one they added.
     /// </summary>
     /// <param name="id">Picture ID.</param>
     /// <returns>No content.</returns>
     [HttpDelete("Images/{id:guid}")]
-    [Authorize(Policy = Policies.RequiresElevation)]
+    [Authorize]
     public ActionResult DeleteImage(Guid id)
     {
         var path = Find(id);
         if (path is null)
         {
             return NotFound();
+        }
+
+        // A picture someone added sits in the folder named after their user ID.
+        if (!User.IsInRole("Administrator") && Path.GetFileName(Path.GetDirectoryName(path)) != CallerId()?.ToString("N"))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden);
         }
 
         System.IO.File.Delete(path);

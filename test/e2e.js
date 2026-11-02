@@ -156,6 +156,15 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
     await page.click('.wiw-gallery .wiw-tile[data-id]');
   } else {
     const photo = await page.screenshot({ clip: { x: 0, y: 0, width: 900, height: 500 } });
+    // backing out of a fresh upload takes it out of the shared gallery again
+    const galleryBefore = (await page.$$('.wiw-gallery .wiw-tile[data-id]')).length;
+    const [oops] = await Promise.all([page.waitForEvent('filechooser'), page.click('.wiw-add')]);
+    await oops.setFiles({ name: 'oops.png', mimeType: 'image/png', buffer: photo });
+    await page.waitForSelector('.wiw-confirm:not([hidden]) .wiw-added:not([hidden])', { timeout: 15000 });
+    await page.click('.wiw-confirm [data-action=back]');
+    await page.waitForTimeout(500);
+    const listed = await (await fetch(B + '/WhoIsWatching/Images', { headers: auth(adminToken) })).json();
+    ok(listed.length === galleryBefore && (await page.$$('.wiw-gallery .wiw-tile[data-id]')).length === galleryBefore, 'Not yet after an upload takes the picture out of the gallery again (' + listed.length + ')');
     const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('.wiw-add')]);
     await chooser.setFiles({ name: 'photo.png', mimeType: 'image/png', buffer: photo });
   }
@@ -407,7 +416,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   for (let i = 0; i < 3; i++) await page.keyboard.press('Escape');
   ok(!(await page.$('.wiw[open]')), 'Escape steps back out of the pictures, Manage profiles, then the picker');
 
-  // gallery API: sign-in to list, images only, 1 MB cap, admins delete, adding needs "manage own preferences"
+  // gallery API: sign-in to list, images only, 1 MB cap, admins delete any picture and people their own, adding needs "manage own preferences"
   const bobApi = await signIn('Bob', 'bobpw', 'e2e-bob');
   const post = (token, body) => fetch(B + '/WhoIsWatching/Images', { method: 'POST', headers: { ...auth(token), 'Content-Type': 'image/jpeg' }, body });
   // a JPEG's frame: start of image, a frame header (SOF0) declaring its size, then data and the end marker
@@ -415,6 +424,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   const jpeg = jpegOf(512, 512);
   const added = await post(bobApi, jpeg);
   const addedId = added.ok ? (await added.json()).Id : '';
+  const adminsId = (await (await post(adminToken, jpeg)).json()).Id;
   const served = await fetch(B + '/WhoIsWatching/Images/' + addedId);
   const kidPolicy = (await (await fetch(B + '/Users', { headers: auth(adminToken) })).json()).find(u => u.Name === 'Kid');
   await fetch(B + `/Users/${kidPolicy.Id}/Policy`, { method: 'POST', headers: { ...auth(adminToken), 'Content-Type': 'application/json' }, body: JSON.stringify({ ...kidPolicy.Policy, EnableUserPreferenceAccess: false }) });
@@ -433,8 +443,9 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
     added: added.status === 200,
     served: served.headers.get('content-type') === 'image/jpeg' && served.headers.get('x-content-type-options') === 'nosniff',
     noPreferences: (await post(kidApi, Buffer.from([0xff, 0xd8, 0xff, 0xe0]))).status === 403,
-    userCantDelete: (await fetch(B + '/WhoIsWatching/Images/' + addedId, { method: 'DELETE', headers: auth(bobApi) })).status === 403,
-    adminDeletes: (await fetch(B + '/WhoIsWatching/Images/' + addedId, { method: 'DELETE', headers: auth(adminToken) })).status === 204,
+    userCantDeleteOthers: (await fetch(B + '/WhoIsWatching/Images/' + adminsId, { method: 'DELETE', headers: auth(bobApi) })).status === 403,
+    userDeletesOwn: (await fetch(B + '/WhoIsWatching/Images/' + addedId, { method: 'DELETE', headers: auth(bobApi) })).status === 204,
+    adminDeletes: (await fetch(B + '/WhoIsWatching/Images/' + adminsId, { method: 'DELETE', headers: auth(adminToken) })).status === 204,
     noTraversal: (await fetch(B + '/WhoIsWatching/Images/..%2F..%2Fsystem.xml')).status === 404
   };
   // one person can't fill the gallery: 20 pictures each (administrators aren't capped)

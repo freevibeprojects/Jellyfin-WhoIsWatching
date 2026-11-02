@@ -71,7 +71,7 @@ The picture is then copied to the profile through Jellyfin's own user-image API,
 
 Each person may add up to 20 pictures (administrators: up to the gallery's 200). Jellyfin's TV layout has no **+** tile, since a remote can't pick a file: pictures added from a phone or computer show up there.
 
-The gallery is kept on the server in `<data dir>/plugins/configurations/WhoIsWatching/images/`, one folder per person who added pictures, so it survives plugin updates. Administrators remove pictures in the plugin's dashboard page. Removing one doesn't change anyone's current picture.
+The gallery is kept on the server in `<data dir>/plugins/configurations/WhoIsWatching/images/`, one folder per person who added pictures, so it survives plugin updates. Administrators remove pictures in the plugin's dashboard page; *Not yet* right after adding one takes it out again. Removing one doesn't change anyone's current picture.
 
 ## Admin setup
 
@@ -143,7 +143,7 @@ After a Jellyfin upgrade, run the smoke test (below) to check all of these at on
   - Listing needs a signed-in user. Each picture is served anonymously by its random ID, because an `<img>` can't send a token; Jellyfin serves user pictures the same way.
   - Adding needs Jellyfin's user-preference access (on by default; see *Manage profiles* above). Only JPEG is accepted (the picker re-encodes every upload to JPEG, which also drops location data from photos), checked by its bytes (a whole JPEG: start and end markers, and a declared size of at most 1024 × 1024 pixels, so a small file can't make every viewer's browser decode a gigantic picture), at most 1 MB each, 20 per person (so one account can't fill it for everyone) and 200 in total. Every profile's browser shows these pictures, so other image formats (WebP's decoder had a remote-code-execution bug, CVE-2023-4863) are refused.
   - Files are named by the server (a new GUID), so nothing a client sends becomes a path. They are served with `X-Content-Type-Options: nosniff` and a sandboxing `Content-Security-Policy`.
-  - Only administrators can delete.
+  - Administrators can delete any picture; others only pictures they added (backing out with *Not yet* right after an upload removes it).
   - Profile pictures are applied through Jellyfin's own API, so Jellyfin's permission checks decide who may change whose picture.
 - Lockout, parental access schedules, device restrictions, max sessions and remote-access policy are all enforced by the server, because the plugin goes through Jellyfin's normal sign-in.
 - Switching signs the previous profile out on this device. Other open tabs still running as that profile lose access, because its token is revoked, and pick up the new profile when reloaded. They share the browser's stored session, as with any Jellyfin sign-in.
