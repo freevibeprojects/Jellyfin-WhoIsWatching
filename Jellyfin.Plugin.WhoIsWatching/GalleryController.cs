@@ -7,6 +7,8 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Data;
+using Jellyfin.Database.Implementations.Enums;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Authorization;
@@ -38,6 +40,9 @@ public sealed partial class GalleryController : ControllerBase
     // declared size is checked too.
     private const int MaxImageSide = 1024;
 
+    // Jellyfin's own password provider; an account another provider handles (LDAP, SSO) has its password elsewhere.
+    private const string DefaultAuthenticationProvider = "Jellyfin.Server.Implementations.Users.DefaultAuthenticationProvider";
+
     // Counting and adding happen under one lock, so parallel uploads can't overshoot the caps.
     private static readonly SemaphoreSlim AddLock = new(1, 1);
 
@@ -56,8 +61,8 @@ public sealed partial class GalleryController : ControllerBase
     }
 
     /// <summary>
-    /// Gets the brand text settings, validated. Anonymous: the picker also covers the sign-in page,
-    /// and the brand text is shown there to anyone anyway.
+    /// Gets the brand text settings, validated, and which profiles on the sign-in screen have no password.
+    /// Anonymous: the picker also covers the sign-in page, and the brand text is shown there to anyone anyway.
     /// </summary>
     /// <returns>The settings.</returns>
     [HttpGet("Settings")]
@@ -70,8 +75,18 @@ public sealed partial class GalleryController : ControllerBase
             text.Length > 40 ? text[..40] : text,
             config.BrandColor is { } color && ColorPattern().IsMatch(color) ? color : "#AA5CC3",
             Math.Clamp(config.BrandSize, 12, 120),
-            config.BrandPosition is "TopCenter" or "TopRight" ? config.BrandPosition : "TopLeft");
+            config.BrandPosition is "TopCenter" or "TopRight" ? config.BrandPosition : "TopLeft",
+            Passwordless());
     }
+
+    // Profiles on the sign-in screen without a password, which the picker signs in with one tap: what
+    // anyone at the sign-in screen learns anyway by trying a blank password.
+    private List<string> Passwordless()
+        => _userManager.GetUsers()
+            .Where(user => string.IsNullOrEmpty(user.Password) && user.AuthenticationProviderId == DefaultAuthenticationProvider
+                && !user.HasPermission(PermissionKind.IsHidden) && !user.HasPermission(PermissionKind.IsDisabled))
+            .Select(user => user.Id.ToString("N"))
+            .ToList();
 
     /// <summary>
     /// Lists the gallery, newest first.
@@ -278,10 +293,11 @@ public sealed partial class GalleryController : ControllerBase
 }
 
 /// <summary>
-/// The picker's brand text.
+/// The picker's brand text, and the profiles it signs in without a password step.
 /// </summary>
 /// <param name="Text">Text; empty hides it.</param>
 /// <param name="Color">Colour as #RRGGBB.</param>
 /// <param name="Size">Size in pixels.</param>
 /// <param name="Position">TopLeft, TopCenter or TopRight.</param>
-public sealed record BrandSettings(string Text, string Color, int Size, string Position);
+/// <param name="Passwordless">IDs of the sign-in screen's profiles that have no password.</param>
+public sealed record BrandSettings(string Text, string Color, int Size, string Position, IReadOnlyList<string> Passwordless);

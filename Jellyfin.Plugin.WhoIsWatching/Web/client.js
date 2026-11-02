@@ -14,9 +14,10 @@
 //   - this plugin's GET /WhoIsWatching/Settings (brand text) and /WhoIsWatching/Images (the shared
 //     picture gallery); a chosen picture is applied with ApiClient.uploadUserImage
 // Jellyfin 12 never tells clients whether a user has a password (UserDto.HasPassword is always
-// true), so every profile goes through the password step, where blank is allowed, exactly like
-// the login page. After a blank password works once, this browser remembers that profile as
-// passwordless and switches to it in one click. That hint is a user ID, never a secret.
+// true), so this plugin's settings list the sign-in screen's profiles that have none: they open in
+// one click. Every other profile goes through the password step, where blank is allowed, exactly
+// like the login page. After a blank password works once, this browser also remembers that profile
+// as passwordless. That hint is a user ID, never a secret.
 // A profile can also be remembered on this device: its Jellyfin access token is kept (never the
 // password), like Jellyfin's own "Remember me", so it opens in one click. Administrators never are.
 // Signed out, the picker covers Jellyfin's sign-in page, which stays underneath for manual sign-in,
@@ -254,6 +255,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     let editing; // the user whose picture is being changed
     let chosen; // the gallery picture about to be applied
     let uploaded = null; // a picture just added and not yet applied
+    let noPassword = []; // IDs of listed profiles the server says have no password
     const buttons = new Map(); // user ID -> profile button
     const colors = new Map(); // user ID -> avatar colour
     const watched = new WeakSet(); // ApiClients whose sign-out is watched
@@ -669,6 +671,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         }
 
         managing = false;
+        noPassword = settings && Array.isArray(settings.Passwordless) ? settings.Passwordless : [];
         // Over the sign-in page there is nothing to fade in from: it shows at once.
         dialog.classList.toggle('wiw-instant', !trigger);
         pickPanel.querySelector('.wiw-disclaimer').hidden = true;
@@ -1092,11 +1095,11 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             return;
         }
 
-        // One click for profiles remembered on this device, or that signed in here with a blank
-        // password before. Nothing else is ever tried, so a protected profile never loses lockout
-        // attempts to a guess.
+        // One click for profiles remembered on this device, without a password (the server says so),
+        // or that signed in here with a blank password before. Nothing else is ever tried, so a
+        // protected profile never loses lockout attempts to a guess.
         const token = canRemember(api) && remembered(api)[user.Id];
-        if (token || passwordless(api).includes(user.Id)) {
+        if (token || noPassword.includes(user.Id) || passwordless(api).includes(user.Id)) {
             button.classList.add('wiw-busy');
             const err = await switchTo(user, token ? null : '', Boolean(token));
             button.classList.remove('wiw-busy');

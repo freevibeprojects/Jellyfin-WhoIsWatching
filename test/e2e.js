@@ -283,8 +283,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await racing.route(/System\/Info\/Public/, async route => { await Promise.race([signedIn, new Promise(r => setTimeout(r, 3000))]); await route.continue(); });
   await racing.goto(B + '/web/');
   await racing.waitForSelector('.wiw[open] .wiw-grid button', { timeout: 30000 });
-  await racing.click('.wiw-grid button[aria-label="Kid"]');
-  await Promise.all([racing.waitForEvent('load', { timeout: 30000 }), racing.click('.wiw-auth button[type=submit]')]);
+  await Promise.all([racing.waitForEvent('load', { timeout: 30000 }), racing.click('.wiw-grid button[aria-label="Kid"]')]);
   ok(await racing.waitForFunction(() => window.ApiClient && window.ApiClient.getCurrentUserId(), null, { timeout: 15000 }).then(() => true, () => false), 'a sign-in from the early picker survives Jellyfin finishing its start-up');
   await racing.context().close();
   const stalled = await (await browser.newContext()).newPage();
@@ -366,6 +365,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   }
   ok(await page.evaluate(() => document.querySelector('.wiw').hasAttribute('open') && !document.querySelector('.wiw-pick').hidden), 'Escape keeps returning to the grid, not closing the picker');
 
+  let sent;
   // correct password switches and revokes old token, even where Jellyfin's "Remember me" was unticked
   await page.evaluate(() => localStorage.setItem('enableAutoLogin', 'false'));
   await page.click('.wiw-grid button[aria-label="Bob"]');
@@ -386,12 +386,16 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   ok(r.status === 401, 'previous (Alice) token revoked: ' + r.status);
   ok(!JSON.stringify(await page.evaluate(() => ({ ...localStorage }))).includes('bobpw'), 'no password in localStorage');
 
-  // passwordless profile: blank password, then remembered for one-click
+  // a profile without a password: the server says so, so it opens in one click from the first time
+  const noPasswordIds = (await (await fetch(B + '/WhoIsWatching/Settings')).json()).Passwordless;
+  const ids = await page.evaluate(async () => Object.fromEntries((await window.ApiClient.getJSON(window.ApiClient.getUrl('Users/Public'))).map(u => [u.Name, u.Id])));
+  ok(JSON.stringify(noPasswordIds) === JSON.stringify([ids.Kid]), 'the settings list only listed profiles without a password (not Hidden, not Bob): ' + JSON.stringify(noPasswordIds));
+  await page.evaluate(() => localStorage.removeItem('whoiswatching-passwordless-' + window.ApiClient.serverId()));
+  sent = auths.length;
   await avatar.click();
-  await page.click('.wiw-grid button[aria-label="Kid"]');
-  await Promise.all([page.waitForEvent('load'), page.click('.wiw-auth button[type=submit]')]);
+  await Promise.all([page.waitForEvent('load'), page.click('.wiw-grid button[aria-label="Kid"]')]);
   await avatar.waitFor({ timeout: 30000 });
-  ok(await me() === 'Kid', 'switched to Kid with blank password');
+  ok(await me() === 'Kid' && auths.length === sent + 1 && JSON.parse(auths[auths.length - 1]).Pw === '', 'Kid opened in one click, with no password step');
   ok((await fetch(B + '/Users/Me', { headers: auth(bobToken) })).status === 200, 'leaving remembered Bob keeps his session');
   await avatar.click();
   await page.click('.wiw-grid button[aria-label="Alice"]');
@@ -406,7 +410,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   ok(await me() === 'Kid', 'Kid switched in one click (remembered passwordless)');
 
   // remembered profile: marked, one click, no password sent
-  let sent = auths.length;
+  sent = auths.length;
   await avatar.click();
   await page.waitForSelector('.wiw[open] .wiw-grid button[aria-label^="Bob"]');
   ok(await page.$eval('.wiw-grid button[aria-label^="Bob"]', b => b.getAttribute('aria-label') === 'Bob, opens without a password on this device' && !!b.querySelector('.wiw-badge svg')), 'a remembered profile is marked as opening without a password');

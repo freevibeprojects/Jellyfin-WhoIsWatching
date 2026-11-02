@@ -39,10 +39,11 @@ The picker doesn't wait for the page. The profiles, the brand text and the profi
 
 ### Password behaviour
 
-Jellyfin 12 never tells clients whether a user has a password: `UserDto.HasPassword` is always `true`, and the login page always shows the password form. This plugin keeps that rule.
+Jellyfin 12 never tells clients whether a user has a password: `UserDto.HasPassword` is always `true`, and the login page always shows the password form.
 
-- Every profile gets a password step, and leaving it blank is allowed. The eye button in the field shows what was typed, and after a wrong password the field keeps it, selected, to fix or type over.
-- A profile is never tried with a blank password automatically. A wrong guess would count toward Jellyfin's login lockout and appear in the activity log.
+- Profiles on the sign-in screen that have no password open in one click, with no password step. The plugin's settings (`GET /WhoIsWatching/Settings`) list their IDs; anyone at the sign-in screen could learn the same by trying a blank password. Only Jellyfin's own passwords count: accounts signed in through another provider (LDAP, SSO) always get the password step.
+- Every other profile gets a password step, and leaving it blank is allowed. The eye button in the field shows what was typed, and after a wrong password the field keeps it, selected, to fix or type over.
+- No other profile is ever tried with a blank password automatically. A wrong guess would count toward Jellyfin's login lockout and appear in the activity log.
 - After a profile signs in with a blank password once, this browser remembers its **user ID** (in `localStorage`, per server) and switches to it in one click next time. If a password is added later, the one-click attempt fails once and the password step appears.
 - **Remember on this device** (in the password step) keeps that profile signed in on this browser, so it opens in one click, like Jellyfin's own *Remember me*. What is kept is the profile's Jellyfin access token, never the password. Switching away from a remembered profile leaves its session running instead of ending it.
   - Remembered profiles carry an open-lock mark in the picker, so whoever hands the device over can see which profiles open without a password.
