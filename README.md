@@ -18,7 +18,7 @@ if needed, and you are now that user.
 | `ClientScriptController.cs` | Serves the embedded script (`GET /WhoIsWatching/client.js`) anonymously. It is static and holds no data. |
 | `GalleryController.cs` | The brand-text settings (`GET /WhoIsWatching/Settings`, anonymous, because the sign-in page shows the brand text) and the shared picture gallery (`/WhoIsWatching/Images`). See *Profile pictures*. |
 | `Web/client.js` | Covers Jellyfin's sign-in page with the picker, and intercepts clicks on the avatar button to show it. It switches users with Jellyfin's own client API, then reloads the page. *Manage profiles* changes pictures; the gear runs the avatar button's normal action (settings or user menu), and the sign-out button signs out of Jellyfin (which also forgets remembered profiles). |
-| `Web/config.html` | The plugin's page in *Dashboard → Plugins*: brand text, who may add pictures, and removing gallery pictures. |
+| `Web/config.html` | The plugin's page in *Dashboard → Plugins*: brand text, the profiles' order, who may add pictures, and removing gallery pictures. |
 
 The switch uses only what the login page uses:
 
@@ -86,6 +86,8 @@ The gallery is kept on the server in `<data dir>/plugins/configurations/WhoIsWat
 **Jellyfin 12 hides new users from login screens by default**, and the picker shows exactly the users the login screen would. For each profile that should appear, go to *Dashboard → Users*, open the user (or its ⋮ menu → *Edit user*), and on the *Profile* tab, near the bottom, untick **Hide this user from login screens**.
 
 Hidden accounts stay reachable through **Other account**, which asks for the name as well as the password.
+
+The profiles show in the order set under *Profile order* on the plugin's dashboard page (for example grandparents first); profiles not placed there follow in Jellyfin's order.
 
 **Set a lockout.** Jellyfin doesn't limit failed sign-ins unless asked to, and anyone at a device can try passwords from the picker (a child on the family tablet, say), for listed profiles and, through *Other account*, hidden ones. For each account, administrators above all, set the failed login attempts before lockout on the same *Profile* tab. The plugin's dashboard page says so too.
 

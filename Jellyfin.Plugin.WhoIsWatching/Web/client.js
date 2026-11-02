@@ -258,6 +258,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     let chosen; // the gallery picture about to be applied
     let uploaded = null; // a picture just added and not yet applied
     let noPassword = []; // IDs of listed profiles the server says have no password
+    let order = []; // IDs in the administrator's order (plugin settings)
     const removable = new Set(); // gallery pictures this person may remove (added them, or an administrator)
     const buttons = new Map(); // user ID -> profile button
     const colors = new Map(); // user ID -> avatar colour
@@ -675,6 +676,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
 
         managing = false;
         noPassword = settings && Array.isArray(settings.Passwordless) ? settings.Passwordless : [];
+        order = settings && Array.isArray(settings.Order) ? settings.Order : [];
         // Over the sign-in page there is nothing to fade in from: it shows at once.
         dialog.classList.toggle('wiw-instant', !trigger);
         pickPanel.querySelector('.wiw-disclaimer').hidden = true;
@@ -690,7 +692,8 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
             || pickPanel.querySelector('.wiw-grid button')).focus();
     }
 
-    function render(api, users) {
+    function render(api, listed) {
+        const users = ordered(listed);
         profiles = users;
         // Colour follows the user ID, so it is stable; collisions move to the next free colour.
         colors.clear();
@@ -724,6 +727,12 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         pickPanel.querySelector('.wiw-other').hidden = Boolean(currentId);
         // A big household: smaller tiles, so everyone and the buttons below fit on one screen.
         dialog.classList.toggle('wiw-crowded', users.length + 1 > 10);
+    }
+
+    // The administrator's order first, then the rest as Jellyfin lists them (a hidden "you" stays last).
+    function ordered(users) {
+        const rank = user => (order.includes(user.Id) ? order.indexOf(user.Id) : order.length);
+        return users.map((user, i) => ({ user, i })).sort((a, b) => rank(a.user) - rank(b.user) || a.i - b.i).map(({ user }) => user);
     }
 
     // The administrator's brand text (plugin settings), in a corner like Netflix's logo.

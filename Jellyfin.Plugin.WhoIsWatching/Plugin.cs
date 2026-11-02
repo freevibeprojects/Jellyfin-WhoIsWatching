@@ -79,6 +79,11 @@ public sealed class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets the users who may not add pictures to the gallery (they can still pick from it).
     /// </summary>
     public Guid[] BlockedUploaders { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the order of the profiles in the picker; profiles not in it follow, as Jellyfin lists them.
+    /// </summary>
+    public Guid[] ProfileOrder { get; set; } = [];
 }
 
 /// <summary>

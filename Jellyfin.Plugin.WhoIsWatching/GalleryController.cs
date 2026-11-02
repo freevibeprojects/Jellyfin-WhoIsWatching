@@ -61,7 +61,8 @@ public sealed partial class GalleryController : ControllerBase
     }
 
     /// <summary>
-    /// Gets the brand text settings, validated, and which profiles on the sign-in screen have no password.
+    /// Gets the brand text settings, validated, the profiles' order, and which profiles on the sign-in screen
+    /// have no password.
     /// Anonymous: the picker also covers the sign-in page, and the brand text is shown there to anyone anyway.
     /// </summary>
     /// <returns>The settings.</returns>
@@ -76,7 +77,19 @@ public sealed partial class GalleryController : ControllerBase
             config.BrandColor is { } color && ColorPattern().IsMatch(color) ? color : "#AA5CC3",
             Math.Clamp(config.BrandSize, 12, 120),
             config.BrandPosition is "TopCenter" or "TopRight" ? config.BrandPosition : "TopLeft",
-            Passwordless());
+            Passwordless(),
+            Order(config));
+    }
+
+    // The administrator's order of the sign-in screen's profiles. Hidden accounts are left out, so this
+    // anonymous answer names no account the sign-in screen doesn't.
+    private List<string> Order(PluginConfiguration config)
+    {
+        var listed = _userManager.GetUsers()
+            .Where(user => !user.HasPermission(PermissionKind.IsHidden) && !user.HasPermission(PermissionKind.IsDisabled))
+            .Select(user => user.Id)
+            .ToHashSet();
+        return config.ProfileOrder.Where(listed.Contains).Select(id => id.ToString("N")).ToList();
     }
 
     // Profiles on the sign-in screen without a password, which the picker signs in with one tap: what
@@ -325,4 +338,5 @@ public sealed record Gallery(IReadOnlyList<GalleryPicture> Images, bool CanAdd);
 /// <param name="Size">Size in pixels.</param>
 /// <param name="Position">TopLeft, TopCenter or TopRight.</param>
 /// <param name="Passwordless">IDs of the sign-in screen's profiles that have no password.</param>
-public sealed record BrandSettings(string Text, string Color, int Size, string Position, IReadOnlyList<string> Passwordless);
+/// <param name="Order">IDs of the sign-in screen's profiles in the administrator's order.</param>
+public sealed record BrandSettings(string Text, string Color, int Size, string Position, IReadOnlyList<string> Passwordless, IReadOnlyList<string> Order);

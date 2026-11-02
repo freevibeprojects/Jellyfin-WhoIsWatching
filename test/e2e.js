@@ -220,6 +220,18 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   ok(await page.textContent('.wiw-pick .wiw-title') === 'Who’s watching?', 'Escape leaves Manage profiles');
   await page.keyboard.press('Escape');
 
+  // the administrator's profile order (hidden accounts left out of the anonymous settings)
+  const publicIds = await page.evaluate(async () => Object.fromEntries((await window.ApiClient.getJSON(window.ApiClient.getUrl('Users/Public'))).map(u => [u.Name, u.Id])));
+  const hiddenId = (await (await fetch(B + '/Users', { headers: auth(adminToken) })).json()).find(u => u.Name === 'Hidden').Id;
+  await config({ ...defaults, ProfileOrder: [hiddenId, publicIds.Kid, publicIds.Bob] });
+  const orderShared = (await (await fetch(B + '/WhoIsWatching/Settings')).json()).Order;
+  await avatar.click();
+  await page.waitForSelector('.wiw[open] .wiw-grid button');
+  const ordered = await page.$$eval('.wiw-grid .wiw-name', els => els.map(e => e.textContent).join());
+  ok(ordered === 'Kid,Bob,Alice,Other account' && JSON.stringify(orderShared) === JSON.stringify([publicIds.Kid, publicIds.Bob]), 'profiles follow the administrator\'s order, then the rest: ' + ordered);
+  await page.keyboard.press('Escape');
+  await config(defaults);
+
   // brand text settings: text, colour, size and position
   await config({ BrandText: 'Family TV', BrandColor: '#FF8800', BrandSize: 56, BrandPosition: 'TopRight' });
   await avatar.click();
@@ -244,10 +256,15 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.fill('#wiwBrandText', 'Saved here');
   const uploaders = await page.$$eval('#wiwUploaders input', boxes => boxes.map(b => b.closest('label').querySelector('.checkboxLabel').textContent + (b.checked ? '' : ' (no)')).join());
   await page.$eval('#wiwUploaders .checkboxContainer:last-child input', b => b.click()); // untick the last (Kid)
+  const listedOrder = await page.$$eval('#wiwOrder [data-id] span', els => els.map(e => e.textContent).join());
+  await page.click('#wiwOrder [data-id]:last-child .wiwMoveUp'); // Kid up, above Bob
   await page.click('#wiwConfigForm button[type=submit]');
   const saved = await page.waitForFunction(() => window.ApiClient.getJSON(window.ApiClient.getUrl('WhoIsWatching/Settings')).then(s => s.Text === 'Saved here'), null, { timeout: 10000 }).then(() => true, () => false);
   const blocked = (await (await fetch(B + '/Plugins/2d627493-2b57-432a-b238-c22aaf9fd609/Configuration', { headers: auth(adminToken) })).json()).BlockedUploaders;
-  const kidUser = (await (await fetch(B + '/Users', { headers: auth(adminToken) })).json()).find(u => u.Name === 'Kid');
+  const everyone = await (await fetch(B + '/Users', { headers: auth(adminToken) })).json();
+  const kidUser = everyone.find(u => u.Name === 'Kid');
+  const savedOrder = (await (await fetch(B + '/WhoIsWatching/Settings')).json()).Order.map(id => everyone.find(u => u.Id === id).Name).join();
+  ok(listedOrder === 'Alice,Bob,Kid' && savedOrder === 'Alice,Kid,Bob', 'the dashboard orders the listed profiles (' + listedOrder + ') and saves the order (' + savedOrder + ')');
   ok(uploaders === 'Bob,Hidden,Kid' && blocked.length === 1 && blocked[0].replace(/-/g, '') === kidUser.Id, 'the dashboard lists who may add pictures (not administrators) and saves who may not: ' + uploaders + ' ' + JSON.stringify(blocked));
   const listed = (await page.$$('#wiwGallery .wiwDelete')).length;
   page.once('dialog', d => d.accept()); // "Delete this picture?"
