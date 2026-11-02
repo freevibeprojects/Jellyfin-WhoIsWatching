@@ -11,7 +11,7 @@
                 <h1>Who's Watching</h1>
                 <form id="wiwConfigForm">
                     <h2>Brand text</h2>
-                    <p class="fieldDescription">Shown in a corner of the "Who's watching?" screen, like Netflix's logo. Leave the text empty to hide it.</p>
+                    <p class="fieldDescription">Shown in a corner of the "Who's watching?" screen, like Netflix's logo. Leave the text empty to hide it. The rest of the screen follows Jellyfin's theme and Custom CSS (Dashboard, General, Branding); a line such as "Need help? Ask whoever set this up" goes in Jellyfin's Login Disclaimer there, shown under the profiles.</p>
                     <div class="inputContainer">
                         <input is="emby-input" type="text" id="wiwBrandText" maxlength="40" label="Text" />
                     </div>
@@ -41,7 +41,7 @@
                 <div id="wiwGallery" style="display:flex;flex-wrap:wrap;gap:1em"></div>
 
                 <h2 style="margin-top:2em">Sign-in safety</h2>
-                <p class="fieldDescription">The picker lists the same profiles as Jellyfin's sign-in page, and anyone at a device can try their passwords, also through Other account. Jellyfin doesn't limit failed attempts unless you ask it to: for each account, especially administrators, set the number of failed login attempts before lockout (Dashboard, Users, the user, Profile). Accounts hidden from the sign-in screen aren't listed, but can still be typed in.</p>
+                <p class="fieldDescription">The picker lists the same profiles as Jellyfin's sign-in page, and anyone at a device can try their passwords, also through Other account. Jellyfin doesn't limit failed attempts unless you ask it to: for each account, especially administrators, set the number of failed login attempts before lockout (Dashboard, Users, the user, Profile). Accounts hidden from the sign-in screen aren't listed, but can still be typed in. Jellyfin hides new accounts from the sign-in screen: to give someone a tile, untick "Hide this user from login screens" (Dashboard, Users, the user, Profile).</p>
             </div>
         </div>
         <script type="text/javascript">

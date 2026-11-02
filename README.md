@@ -57,7 +57,7 @@ The picker scales with the screen: the same proportions on a phone, at 1080p, on
 
 It is styled by the active theme, the way Jellyfin's own pages are: its buttons, password field, checkbox and pictures carry Jellyfin's own classes (`emby-button`, `button-submit`, `emby-input`, `emby-checkbox`, `cardImageContainer`), so the built-in themes and any Custom CSS restyle them too. Nothing is rounded unless the theme rounds Jellyfin's cards and buttons (`--jf-card-borderRadius`), profiles without a picture get the theme's card colours, and the background is the page's own (a theme's image, or a Custom CSS background on `body` or `.backgroundContainer`), read each time the picker opens. The ring around the current profile takes the colour of Jellyfin's primary buttons. In the TV layout, the focused button grows as on Jellyfin's TV pages.
 
-The brand text in the corner (like Netflix's logo) is set in *Dashboard → Plugins → Who's Watching*: text, colour, size and position (top left, centre or right). It defaults to "Jellyfin" in Jellyfin's logo purple, `#AA5CC3`. Leave the text empty to hide it. Text too wide for the screen is cut short with an ellipsis.
+The brand text in the corner (like Netflix's logo) is set in *Dashboard → Plugins → Who's Watching*: text, colour, size and position (top left, centre or right). It defaults to "Jellyfin" in Jellyfin's logo purple, `#AA5CC3`. Leave the text empty to hide it. On a narrow screen a long text gets smaller to fit; only a very long one is cut short with an ellipsis.
 
 ### Profile pictures
 
