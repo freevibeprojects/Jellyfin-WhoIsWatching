@@ -366,10 +366,16 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await sameSession.goto(B + '/web/');
   const keptOpen = await sameSession.waitForFunction(() => window.ApiClient && window.ApiClient.getCurrentUserId(), null, { timeout: 30000 }).then(() => true, () => false);
   await sameSession.context().close();
+  // a browser restoring its last session brings the session cookie back, but no page ran meanwhile
+  const stale = { ...state, origins: state.origins.map(o => ({ ...o, localStorage: o.localStorage.map(e => (e.name === 'whoiswatching-alive' ? { ...e, value: String(Date.now() - 600000) } : e)) })) };
+  const restored = await (await browser.newContext({ storageState: stale })).newPage();
+  await restored.goto(B + '/web/');
+  const restoredSignedOut = await restored.waitForSelector('.wiw[open] .wiw-grid button', { timeout: 30000 }).then(() => true, () => false);
+  await restored.context().close();
   const reopened = await (await browser.newContext({ storageState: { ...state, cookies: [] } })).newPage();
   await reopened.goto(B + '/web/');
   const signedOutAgain = await reopened.waitForSelector('.wiw[open] .wiw-grid button', { timeout: 30000 }).then(() => true, () => false);
-  ok(keptOpen && signedOutAgain && (await fetch(B + '/Users/Me', { headers: auth(closedToken) })).status === 401, 'a sign-in without Remember lasts the browser session and ends once the browser is closed');
+  ok(keptOpen && restoredSignedOut && signedOutAgain && (await fetch(B + '/Users/Me', { headers: auth(closedToken) })).status === 401, 'a sign-in without Remember lasts the browser session and ends once the browser is closed, even when it restores its session');
   await reopened.context().close();
   let themedPage = await customCss('');
   const themed = await radius(themedPage);
