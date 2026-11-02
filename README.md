@@ -31,7 +31,7 @@ There is no new authentication endpoint, session store, cookie or cryptography. 
 
 ### The sign-in page
 
-Signed out (a first visit, or after signing out), the picker covers Jellyfin's sign-in page and lists the same profiles. Jellyfin's page stays underneath: **Other ways to sign in** (or Escape) shows it, for Quick Connect and *Forgot password*. Jellyfin's *Login Disclaimer* (Dashboard → General → Branding) is shown under the profiles, as plain text. After signing in you land where Jellyfin's page would have taken you (a shared link, for example). If no profile is listed, Jellyfin's page shows as it is.
+Signed out (a first visit, or after signing out), the picker covers Jellyfin's sign-in page and lists the same profiles. Jellyfin's page stays underneath: **Other ways to sign in** (or Escape) shows it, for Quick Connect and *Forgot password*. Jellyfin's *Login Disclaimer* (Dashboard → General → Branding) is shown under the profiles, as plain text. After signing in you land where Jellyfin's page would have taken you (a shared link, for example). If no profile is listed, Jellyfin's page shows as it is. Focus starts on the profile last signed in on this device, so Enter right away usually picks the right one.
 
 **Other account**, the last tile, signs in to an account the list doesn't show (one hidden from the sign-in screen, such as the administrator's) by asking for its name and password. It is there on the avatar's picker too, so switching to a hidden account doesn't need signing out first.
 

@@ -77,6 +77,7 @@
     const PASSWORDLESS_KEY = 'whoiswatching-passwordless-';
     const SWITCH_KEY = 'whoiswatching-switching'; // sessionStorage: who the reload after a sign-in is for
     const REMEMBERED_KEY = 'whoiswatching-remembered-';
+    const LAST_KEY = 'whoiswatching-last-'; // [user ID] last signed in from the picker on this device
     const CARD_COLORS = 5; // the theme's defaultCardBackground1..5, as on Jellyfin's sign-in page
     // Material icons (Apache 2.0): close, settings, edit, add, arrow, person.
     const ICON_CLOSE = 'M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z';
@@ -651,8 +652,10 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         render(api, users);
         showPick();
         showDialog();
-        // Keyboards and remotes start on a profile; on a touch screen that ring would look like a choice made.
-        (touchOnly() ? dialog : pickPanel.querySelector('[aria-current]') || pickPanel.querySelector('.wiw-grid button')).focus();
+        // Keyboards and remotes start on a profile (the current one, else the one last signed in here, so
+        // Enter right away is usually right); on a touch screen that ring would look like a choice made.
+        (touchOnly() ? dialog : pickPanel.querySelector('[aria-current]') || buttons.get(stored(api, LAST_KEY, [])[0])
+            || pickPanel.querySelector('.wiw-grid button')).focus();
     }
 
     function render(api, users) {
@@ -1279,6 +1282,7 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         }
 
         store(api, REMEMBERED_KEY, tokens);
+        store(api, LAST_KEY, [userId]);
         if (password !== null) {
             rememberPasswordless(api, userId, password === '');
         }

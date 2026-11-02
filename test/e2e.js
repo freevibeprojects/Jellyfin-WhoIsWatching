@@ -524,6 +524,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await Promise.all([page.waitForEvent('load'), page.keyboard.press('Enter')]);
   await avatar.waitFor({ timeout: 30000 });
   ok(await me() === 'Hidden', 'switched to an account hidden from the sign-in screen, without signing out');
+  ok(await page.evaluate(() => JSON.parse(localStorage.getItem('whoiswatching-last-' + window.ApiClient.serverId()))[0] === window.ApiClient.getCurrentUserId()), 'a sign-in notes who signed in last on this device');
   await avatar.click();
   await page.waitForSelector('.wiw[open] .wiw-grid button');
   const order = await page.$$eval('.wiw-grid .wiw-name', es => es.map(e => e.textContent).join());
@@ -538,10 +539,12 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await page.evaluate(([id, token]) => { const key = 'whoiswatching-remembered-' + window.ApiClient.serverId(); localStorage.setItem(key, JSON.stringify({ ...JSON.parse(localStorage.getItem(key)), [id]: token })); }, [kidId, kidToken]);
   const signOutAt = await page.evaluate(() => { window.loginShownAt = 0; performance.clearResourceTimings(); return performance.now(); });
   await page.keyboard.press('Escape');
+  await page.evaluate(id => localStorage.setItem('whoiswatching-last-' + window.ApiClient.serverId(), JSON.stringify([id])), kidId);
   await page.evaluate(() => window.Dashboard.logout()); // Jellyfin's own sign-out, then its sign-in page
   await page.waitForTimeout(500);
   ok(JSON.stringify(await remembered()) === '{}' && (await fetch(B + '/Users/Me', { headers: auth(kidToken) })).status === 401, 'signing out forgets remembered profiles and ends their sessions');
   await page.waitForSelector('.wiw[open] .wiw-grid button', { timeout: 30000 });
   ok(await profilesAhead(signOutAt), 'after signing out, the picker’s profiles were requested before the sign-in page showed');
+  ok(await page.evaluate(() => document.activeElement.getAttribute('aria-label')) === 'Kid', 'the sign-in picker starts on the profile last signed in here');
   await browser.close();
 })().catch(e => { console.log('FAIL exception ' + e.message); process.exit(1); });
