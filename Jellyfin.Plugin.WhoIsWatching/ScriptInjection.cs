@@ -34,8 +34,7 @@ public sealed class ScriptInjectionMiddleware
 {
     // Relative to ".../web/", so it resolves correctly under any BaseUrl or reverse-proxy prefix. Async:
     // it runs as soon as it is there (at once from the cache), before or after Jellyfin's own code.
-    private static readonly byte[] ScriptTag = Encoding.UTF8.GetBytes(
-        $"<script async src=\"../WhoIsWatching/client.js?v={typeof(Plugin).Assembly.GetName().Version}\"></script>");
+    private static readonly string ScriptSource = $"../WhoIsWatching/client.js?v={typeof(Plugin).Assembly.GetName().Version}";
 
     private readonly RequestDelegate _next;
 
@@ -94,11 +93,14 @@ public sealed class ScriptInjectionMiddleware
             at = content.Length; // A trailing script is still parsed into <body>.
         }
 
+        // The idle setting rides on the tag, so the cached script needs no request to learn it.
+        var idle = Math.Clamp(Plugin.Instance?.Configuration.IdleMinutes ?? 0, 0, 1440);
+        var tag = Encoding.UTF8.GetBytes($"<script async src=\"{ScriptSource}\" data-idle=\"{idle}\"></script>");
         response.Headers.Remove(HeaderNames.ETag);
         response.Headers.Remove(HeaderNames.LastModified);
-        response.ContentLength = content.Length + ScriptTag.Length;
+        response.ContentLength = content.Length + tag.Length;
         await body.WriteAsync(content[..at], context.RequestAborted).ConfigureAwait(false);
-        await body.WriteAsync(ScriptTag, context.RequestAborted).ConfigureAwait(false);
+        await body.WriteAsync(tag, context.RequestAborted).ConfigureAwait(false);
         await body.WriteAsync(content[at..], context.RequestAborted).ConfigureAwait(false);
     }
 

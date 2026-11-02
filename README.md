@@ -87,6 +87,8 @@ The gallery is kept on the server in `<data dir>/plugins/configurations/WhoIsWat
 
 Hidden accounts stay reachable through **Other account**, which asks for the name as well as the password.
 
+*Back to the picker when idle*, on the same page, brings the picker back after a number of minutes with nobody touching the device and nothing playing (off by default). A profile not remembered on that device is signed out; remembered ones stay remembered, and the picker just opens over them. It takes effect the next time Jellyfin Web is opened.
+
 The profiles show in the order set under *Profile order* on the plugin's dashboard page (for example grandparents first); profiles not placed there follow in Jellyfin's order.
 
 **Set a lockout.** Jellyfin doesn't limit failed sign-ins unless asked to, and anyone at a device can try passwords from the picker (a child on the family tablet, say), for listed profiles and, through *Other account*, hidden ones. For each account, administrators above all, set the failed login attempts before lockout on the same *Profile* tab. The plugin's dashboard page says so too.

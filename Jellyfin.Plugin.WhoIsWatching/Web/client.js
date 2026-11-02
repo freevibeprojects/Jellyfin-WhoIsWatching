@@ -243,6 +243,8 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     // Shown in the console so a device where the picker doesn't appear can be checked (F12, or
     // chrome://inspect for the Android app).
     const VERSION = ((document.currentScript && /[?&]v=([\d.]+)/.exec(document.currentScript.src)) || [])[1];
+    // Minutes without input before a signed-in profile goes back to the picker (0: never), from the tag.
+    const IDLE_MINUTES = Math.min(Number(document.currentScript && document.currentScript.dataset.idle) || 0, 1440);
     console.info(`[WhoIsWatching] ${VERSION || ''} loaded`);
 
     let dialog;
@@ -269,6 +271,8 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     let closing = false;
     let declined = false; // the sign-in picker was closed before Jellyfin's sign-in page showed
     let replaced = false; // the picker is closing because another page showed
+    let keepRemembered = false; // the next sign-out is an idle one, which keeps remembered profiles
+    let lastInput = Date.now();
 
     let preload; // { api, at, data }: profiles requested when the avatar was pressed, for the click that follows
     let early; // { api, at, data }: the sign-in page's data, requested before the page shows (see prefetch)
@@ -287,6 +291,12 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
     window.addEventListener('pointerdown', startPreload, true);
     window.addEventListener('focusin', startPreload, true);
     document.addEventListener('keydown', onShortcut);
+    if (IDLE_MINUTES) {
+        ['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(type => window.addEventListener(type, () => {
+            lastInput = Date.now();
+        }, { capture: true, passive: true }));
+        setInterval(checkIdle, 15000);
+    }
 
     // Jellyfin's sign-in page (every page Jellyfin shows fires viewbeforeshow and viewshow; they don't
     // always bubble, so they are caught on the way down), including one shown before this script ran.
@@ -338,11 +348,37 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         const typing = e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]');
         if ((e.key === 'p' || e.key === 'P') && !e.ctrlKey && !e.altKey && !e.metaKey && !e.defaultPrevented && !typing
             && !isOpen() && !/^#\/video/.test(location.hash) && usable(window.ApiClient)) {
-            const target = Array.from(document.querySelectorAll(AVATAR_SELECTOR)).find(el => el.getClientRects().length);
+            const target = visibleAvatar();
             if (target) {
                 e.preventDefault();
                 target.click();
             }
+        }
+    }
+
+    function visibleAvatar() {
+        return Array.from(document.querySelectorAll(AVATAR_SELECTOR)).find(el => el.getClientRects().length);
+    }
+
+    // After the administrator's idle time, back to the picker, unless something is playing. A profile
+    // not remembered here is signed out (remembered ones stay remembered), so whoever comes next can't
+    // carry on as it; a remembered one opens with a tap anyway, so the picker just opens over it.
+    function checkIdle() {
+        const api = window.ApiClient;
+        if (Date.now() - lastInput < IDLE_MINUTES * 60000 || isOpen() || opening || busy || !usable(api)
+            || Array.from(document.querySelectorAll('video, audio')).some(media => !media.paused)) {
+            return;
+        }
+
+        lastInput = Date.now();
+        if (canRemember(api) && remembered(api)[api.getCurrentUserId()]) {
+            const avatar = visibleAvatar();
+            if (avatar) {
+                avatar.click();
+            }
+        } else {
+            keepRemembered = true;
+            signOut(api);
         }
     }
 
@@ -1249,14 +1285,19 @@ button.wiw-profile:focus-visible .wiw-avatar{box-shadow:0 0 0 calc(.19 * var(--u
         watched.add(api);
         const logout = api.logout;
         api.logout = function (...args) {
-            const current = api.accessToken();
-            for (const token of Object.values(remembered(api))) {
-                if (token !== current) {
-                    revoke(api, token);
+            // An idle sign-out (checkIdle) leaves the other remembered profiles as they are.
+            if (!keepRemembered) {
+                const current = api.accessToken();
+                for (const token of Object.values(remembered(api))) {
+                    if (token !== current) {
+                        revoke(api, token);
+                    }
                 }
+
+                store(api, REMEMBERED_KEY, {});
             }
 
-            store(api, REMEMBERED_KEY, {});
+            keepRemembered = false;
             // The sign-in page comes next: its profiles load alongside the sign-out (the ending
             // token doesn't matter to these anonymous requests).
             if (hasApi(api)) {

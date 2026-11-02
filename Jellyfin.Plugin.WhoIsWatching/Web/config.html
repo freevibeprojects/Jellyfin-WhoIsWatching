@@ -32,6 +32,11 @@
                     <div style="margin:1em 0 2em;padding:1em 1.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:var(--jf-palette-background-default,#101010)">
                         <span id="wiwBrandPreview" style="font-weight:700;line-height:1"></span>
                     </div>
+                    <h2>Back to the picker when idle</h2>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="number" id="wiwIdleMinutes" min="0" max="1440" required label="Minutes without input (0: never)" />
+                        <div class="fieldDescription">After this long with nobody touching the device and nothing playing, the picker comes back, so whoever comes next starts there. A profile not remembered on that device is signed out (others stay remembered). Takes effect the next time Jellyfin is opened.</div>
+                    </div>
                     <h2>Profile order</h2>
                     <p class="fieldDescription">The order of the profiles in the picker, on the sign-in screen and from the avatar. Accounts hidden from the sign-in screen aren't listed there.</p>
                     <div id="wiwOrder" style="margin-bottom:2em"></div>
@@ -167,6 +172,7 @@
                         field('wiwBrandColor').value = /^#[0-9A-Fa-f]{6}$/.test(config.BrandColor) ? config.BrandColor : '#AA5CC3';
                         field('wiwBrandSize').value = config.BrandSize;
                         field('wiwBrandPosition').value = config.BrandPosition || 'TopLeft';
+                        field('wiwIdleMinutes').value = config.IdleMinutes || 0;
                         preview();
                         Dashboard.hideLoadingMsg();
                     });
@@ -185,6 +191,7 @@
                         config.BrandColor = field('wiwBrandColor').value;
                         config.BrandSize = Number(field('wiwBrandSize').value);
                         config.BrandPosition = field('wiwBrandPosition').value;
+                        config.IdleMinutes = Math.min(Math.max(Number(field('wiwIdleMinutes').value) || 0, 0), 1440);
                         config.ProfileOrder = Array.prototype.map.call(page.querySelectorAll('#wiwOrder [data-id]'), function (row) { return row.getAttribute('data-id'); });
                         config.BlockedUploaders = Array.prototype.filter.call(page.querySelectorAll('#wiwUploaders input'), function (box) { return !box.checked; })
                             .map(function (box) { return box.getAttribute('data-id'); });

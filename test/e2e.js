@@ -330,6 +330,21 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await stalled.waitForTimeout(3500);
   ok(await stalled.$eval('#loginPage', p => getComputedStyle(p).visibility === 'visible'), 'a stalled profile list leaves Jellyfin’s sign-in page visible after 3 s');
   await stalled.context().close();
+  // idle: after the administrator's minutes with no input, a profile not remembered is signed out
+  await config({ ...defaults, IdleMinutes: 1 });
+  const idle = await (await browser.newContext()).newPage();
+  await idle.clock.install();
+  await idle.goto(B + '/web/');
+  await idle.waitForSelector('.wiw[open] .wiw-grid button', { timeout: 30000 });
+  await Promise.all([idle.waitForEvent('load', { timeout: 30000 }), idle.click('.wiw-grid button[aria-label="Kid"]')]);
+  await idle.waitForFunction(() => window.ApiClient && window.ApiClient.getCurrentUserId(), null, { timeout: 30000 });
+  await idle.waitForTimeout(1000);
+  await idle.clock.fastForward('00:50');
+  const stillIn = await idle.evaluate(() => Boolean(window.ApiClient.getCurrentUserId()));
+  await idle.clock.fastForward('00:30');
+  ok(stillIn && await idle.waitForSelector('.wiw[open] .wiw-grid button', { timeout: 30000 }).then(() => true, () => false) && await idle.evaluate(() => !window.ApiClient.getCurrentUserId()), 'idle past the administrator\'s minutes: signed out, back to the sign-in picker');
+  await idle.context().close();
+  await config(defaults);
   let themedPage = await customCss('');
   const themed = await radius(themedPage);
   await themedPage.context().close();

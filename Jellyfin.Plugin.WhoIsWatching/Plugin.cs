@@ -84,6 +84,11 @@ public sealed class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets the order of the profiles in the picker; profiles not in it follow, as Jellyfin lists them.
     /// </summary>
     public Guid[] ProfileOrder { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the minutes without input after which a signed-in profile goes back to the picker; 0 never.
+    /// </summary>
+    public int IdleMinutes { get; set; }
 }
 
 /// <summary>
